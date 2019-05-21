@@ -99,7 +99,4 @@ return [
         'filter_placeholder' => '过滤',
     ],
     'menu_titles' => [],
-
-    'field'                 => '字段',
-    'required'              => '必填'
 ];

@@ -4,7 +4,9 @@ namespace App\Admin\Controllers;
 
 use App\Model\Shop;
 use App\Http\Controllers\Controller;
+use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
@@ -27,6 +29,8 @@ class ShopController extends Controller
      */
     public function index(Content $content)
     {
+//    	dd(Admin::user());
+
         return $content
             ->header('门店信息管理')
             ->description('区域门店')
@@ -42,9 +46,11 @@ class ShopController extends Controller
      */
     public function show($id, Content $content)
     {
+		Permission::check('shops.list');
+
         return $content
             ->header('区域门店')
-            ->description('门店信息')
+            ->description('详情')
             ->body($this->detail($id));
     }
 
@@ -59,7 +65,7 @@ class ShopController extends Controller
     {
         return $content
             ->header('区域门店')
-            ->description('编辑门店')
+            ->description('编辑')
             ->body($this->form()->edit($id));
     }
 
@@ -73,16 +79,16 @@ class ShopController extends Controller
     {
         return $content
             ->header('区域门店')
-            ->description('新建门店')
+            ->description('新建')
             ->body($this->form());
     }
 
 
     public function shopsList()
     {
-        $accounts = Shop::get(['s_id as id', 's_name as text']);
+        $shops = Shop::get(['s_id as id', 's_name as text']);
 
-        return $accounts;
+        return $shops;
     }
 
     /**
@@ -94,6 +100,7 @@ class ShopController extends Controller
     {
         $grid = new Grid(new Shop);
 
+        $grid->s_id('ID');
         $grid->s_number('门店序号');
         $grid->district()->a_district('区域');
         $grid->district()->a_city('城市');
@@ -114,9 +121,21 @@ class ShopController extends Controller
             $filter->disableIdFilter();
 
             $filter->column(1/2, function ($filter) {
-                $filter->equal('s_district', '区域');
-                $filter->equal('s_city', '城市');
-                $filter->equal('s_manager_phone', '区域联系电话');
+                $filter->equal('s_account_id', '区域')->select('/admin/district/accounts_list');
+
+				$filter->where(function ($query) {
+					$query->whereHas('district', function ($query) {
+						$query->where('a_city', $this->input);
+					});
+
+				}, '城市');
+
+				$filter->where(function ($query) {
+					$query->whereHas('district', function ($query) {
+						$query->where('a_manager_phone', $this->input);
+					});
+
+				}, '区域联系电话');
             });
             $filter->column(1/2, function ($filter) {
                 $filter->equal('s_number', '门店序号');
@@ -139,17 +158,26 @@ class ShopController extends Controller
         $show = new Show(Shop::findOrFail($id));
 
         $show->s_number('门店序号');
-        $show->district()->a_district('区域');
-        $show->district()->a_city('城市');
-        $show->district()->a_manager('区域负责人姓名');
-        $show->district()->a_manager_phone('区域联系电话');
+        $show->district('区域', function ($district) {
+			$district->a_district('区域');
+			$district->a_city('城市');
+			$district->a_manager('区域负责人姓名');
+			$district->a_manager_phone('区域联系电话');
+		});
+
         $show->s_name('门店名称');
         $show->s_manager('门店负责人姓名');
         $show->s_manager_phone('门店负责人电话');
         $show->s_password('门店核销密码');
-        $show->s_state('是否停用');
+        $show->s_state('是否停用')->using([0 => '否', 1 => '是']);
         $show->s_created('创建时间');
         $show->s_updated('修改时间');
+
+		$show->panel()->tools(function ($tools) {
+			$tools->disableDelete(false);
+			$tools->disableEdit(false);
+			$tools->disableList(false);
+		});
 
         return $show;
     }
@@ -167,7 +195,7 @@ class ShopController extends Controller
             '/admin/district/accounts_info/a_city',
             '/admin/district/accounts_info/a_manager',
             '/admin/district/accounts_info/a_manager_phone'
-        ]);
+        ])->rules('required', ['required' => '请选择区域']);
 
         $form->select('a_city', '城市');
         $form->select('a_manager', '区域负责人姓名');

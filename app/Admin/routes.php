@@ -23,6 +23,6 @@ Route::group([
 
     // 用户管理
     $router->get('users/point_record', 'UserController@pointRecord');
-    $router->get('users/point_record/{point_record}', 'UserController@pointRecordShow');
+    $router->get('users/point_record/{id}', 'UserController@pointRecordShow');
     $router->resource('users', UserController::class);
 });

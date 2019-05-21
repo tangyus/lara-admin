@@ -27,6 +27,10 @@ class AccountController
         'off' => ['value' => 0, 'text' => '否', 'color' => 'default'],
     ];
 
+	/**
+	 * @param Content $content
+	 * @return Content
+	 */
     public function index(Content $content)
     {
         return $content
@@ -60,7 +64,7 @@ class AccountController
     {
         return $content
             ->header('区域账号')
-            ->description('创建区域账号')
+            ->description('创建')
             ->body($this->form());
     }
 
@@ -95,7 +99,7 @@ class AccountController
     {
         $accounts = Account::get(['a_id as id', 'a_district as text']);
 
-        return $accounts;
+        return $accounts ? $accounts : $this->districts;
     }
 
     /**
@@ -114,11 +118,15 @@ class AccountController
         $show->a_manager_phone('区域联系电话');
         $show->a_account('账号');
         $show->a_password('密码');
-        $show->a_state('是否停用')->display(function ($state) {
-            return $state ? '是' : '否';
-        });
+        $show->a_state('是否停用')->using([1 => '是', 0 => '否']);
         $show->a_created('创建时间');
         $show->a_updated('修改时间');
+
+        $show->panel()->tools(function ($tools) {
+        	$tools->disableDelete(false);
+			$tools->disableEdit(false);
+			$tools->disableList(false);
+		});
 
         return $show;
     }
@@ -132,6 +140,7 @@ class AccountController
     {
         $grid = new Grid(new Account());
 
+        $grid->a_id('ID');
         $grid->a_district('区域');
         $grid->a_city('城市');
         $grid->a_manager('区域负责人姓名');
@@ -148,8 +157,12 @@ class AccountController
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
 
-            $filter->equal('a_district', '区域');
-            $filter->like('a_manager', '区域负责人姓名');
+            $filter->column(1/2, function ($filter) {
+				$filter->equal('a_district', '区域')->select('/admin/district/accounts_list');
+			});
+			$filter->column(1/2, function ($filter) {
+				$filter->equal('a_manager', '区域负责人姓名');
+			});
         });
 
         return $grid;
@@ -174,12 +187,6 @@ class AccountController
         $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
         $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
         $form->switch('a_state', '是否停用')->states($this->states);
-
-        $form->footer(function ($footer) {
-            $footer->disableViewCheck();
-            $footer->disableEditingCheck();
-            $footer->disableCreatingCheck();
-        });
 
         return $form;
     }

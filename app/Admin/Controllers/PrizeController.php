@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
+use Encore\Admin\Admin;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
@@ -72,6 +73,7 @@ class PrizeController extends Controller
      */
     public function create(Content $content)
     {
+
         return $content
             ->header('区域礼品')
             ->description('创建')
@@ -95,8 +97,12 @@ class PrizeController extends Controller
         });
         $grid->p_type('礼品类型')->radio((new Prize())->prizeType);
         $grid->p_name('礼品名称');
-        $grid->p_point('兑换所需积分');
-        $grid->p_rate('中奖概率');
+        $grid->p_point('兑换所需积分')->display(function () {
+			return (is_null($this->p_point) || $this->p_point == 0) ? '-' : $this->p_point;
+		});
+        $grid->p_rate('中奖概率')->display(function () {
+			return is_null($this->p_rate) ? '-' : $this->p_rate . '%';
+		});
         $grid->p_state('是否停用')->switch($this->states);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
@@ -128,14 +134,26 @@ class PrizeController extends Controller
     {
         $show = new Show(Prize::findOrFail($id));
 
-        $show->district()->a_district('区域');
-        $show->p_type('礼品类型');
+        $show->district('区域')->as(function ($district) {
+			return $district->a_district;
+		});
+        $show->p_type('礼品类型')->using((new Prize())->prizeType);
         $show->p_name('礼品名称');
-        $show->p_point('兑换所需积分');
-        $show->p_state('是否停用');
+        $show->p_point('兑换所需积分')->as(function ($point) {
+			return (is_null($point) || $point == 0) ? '-' : $point;
+		});
+        $show->p_state('是否停用')->using([0 => '否', 1 => '是']);
         $show->p_created('创建时间');
         $show->p_updated('修改时间');
-        $show->p_rate('中奖概率');
+        $show->p_rate('中奖概率')->as(function ($rate) {
+        	return is_null($rate) ? '-' : $rate . '%';
+		});
+
+		$show->panel()->tools(function ($tools) {
+			$tools->disableDelete(false);
+			$tools->disableEdit(false);
+			$tools->disableList(false);
+		});
 
         return $show;
     }
@@ -158,14 +176,9 @@ class PrizeController extends Controller
             ->stacked()
             ->default(1);
         $form->switch('p_state', '是否停用')->states($this->states);
-        $form->number('p_point', '兑换所需积分')->min(0);
+        $form->number('p_point', '兑换所需积分')->min(0)->default(0);
         $form->rate('p_rate', '中奖概率')->setWidth(1, 2);
 
-        $form->footer(function ($footer) {
-            $footer->disableViewCheck();
-            $footer->disableEditingCheck();
-            $footer->disableCreatingCheck();
-        });
         return $form;
     }
 }
