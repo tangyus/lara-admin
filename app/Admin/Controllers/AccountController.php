@@ -9,6 +9,7 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AccountController
 {
@@ -102,6 +103,15 @@ class AccountController
         return $accounts ? $accounts : $this->districts;
     }
 
+    public function accountsCities($id)
+    {
+        $account = Account::select(DB::raw('a_id as id, a_city as text'))
+            ->where('a_id', $id)
+            ->get();
+
+        return $account;
+    }
+
     /**
      * Make a show builder.
      *
@@ -158,7 +168,7 @@ class AccountController
             $filter->disableIdFilter();
 
             $filter->column(1/2, function ($filter) {
-				$filter->equal('a_district', '区域')->select('/admin/district/accounts_list');
+				$filter->equal('a_district', '区域')->select('/admin/accounts_list');
 			});
 			$filter->column(1/2, function ($filter) {
 				$filter->equal('a_manager', '区域负责人姓名');

@@ -11,7 +11,6 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
-use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
@@ -94,7 +93,7 @@ class UserController extends Controller
             $filter->disableIdFilter();
 
             $filter->column(1 / 2, function ($filter) {
-                $filter->equal('u_account_id', '区域')->select('district/accounts_list');
+                $filter->equal('u_account_id', '区域')->select('/admin/accounts_list');
             });
             $filter->column(1 / 2, function ($filter) {
                 $filter->equal('u_phone', '手机号');
@@ -188,13 +187,13 @@ class UserController extends Controller
                     $query->whereHas('user', function ($query) {
                         $query->where('u_account_id', $this->input);
                     });
-                }, '用户区域')->select('/admin/district/accounts_list');
+                }, '用户区域')->select('/admin/accounts_list');
 
                 $filter->between('pr_created', '时间')->datetime();
             });
             $filter->column(1 / 2, function ($filter) {
                 $filter->equal('pr_prize_id', '礼品类型')->select((new Prize())->prizeType);
-                $filter->equal('pr_shop_id', '使用门店')->select('/admin/district/shops_list');
+                $filter->equal('pr_shop_id', '使用门店')->select('/admin/shops_list');
             });
         });
 

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controllers;
 
+use App\model\Account;
 use App\Model\Shop;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Auth\Permission;
@@ -17,7 +18,7 @@ class ShopController extends Controller
     use HasResourceActions;
 
     protected $states = [
-        'on'  => ['value' => 1, 'text' => '是', 'color' => 'primary'],
+        'on' => ['value' => 1, 'text' => '是', 'color' => 'primary'],
         'off' => ['value' => 0, 'text' => '否', 'color' => 'default'],
     ];
 
@@ -29,8 +30,7 @@ class ShopController extends Controller
      */
     public function index(Content $content)
     {
-//    	dd(Admin::user());
-
+//        dd(Admin::user()->can('shops.show'));
         return $content
             ->header('门店信息管理')
             ->description('区域门店')
@@ -46,7 +46,8 @@ class ShopController extends Controller
      */
     public function show($id, Content $content)
     {
-		Permission::check('shops.list');
+        dd(1);
+//        Permission::check('shops.list');
 
         return $content
             ->header('区域门店')
@@ -115,29 +116,32 @@ class ShopController extends Controller
         $grid->s_updated('修改时间');
 
         $grid->disableRowSelector();
+        $grid->actions(function ($actions) {
+            $actions->disableDelete();
+        });
 
         // 数据查询过滤
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
 
-            $filter->column(1/2, function ($filter) {
-                $filter->equal('s_account_id', '区域')->select('/admin/district/accounts_list');
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
 
-				$filter->where(function ($query) {
-					$query->whereHas('district', function ($query) {
-						$query->where('a_city', $this->input);
-					});
+                $filter->where(function ($query) {
+                    $query->whereHas('district', function ($query) {
+                        $query->where('a_city', $this->input);
+                    });
 
-				}, '城市');
+                }, '城市');
 
-				$filter->where(function ($query) {
-					$query->whereHas('district', function ($query) {
-						$query->where('a_manager_phone', $this->input);
-					});
+                $filter->where(function ($query) {
+                    $query->whereHas('district', function ($query) {
+                        $query->where('a_manager_phone', $this->input);
+                    });
 
-				}, '区域联系电话');
+                }, '区域联系电话');
             });
-            $filter->column(1/2, function ($filter) {
+            $filter->column(1 / 2, function ($filter) {
                 $filter->equal('s_number', '门店序号');
                 $filter->like('s_name', '门店名称');
                 $filter->equal('s_manager_phone', '门店联系电话');
@@ -159,11 +163,11 @@ class ShopController extends Controller
 
         $show->s_number('门店序号');
         $show->district('区域', function ($district) {
-			$district->a_district('区域');
-			$district->a_city('城市');
-			$district->a_manager('区域负责人姓名');
-			$district->a_manager_phone('区域联系电话');
-		});
+            $district->a_district('区域');
+            $district->a_city('城市');
+            $district->a_manager('区域负责人姓名');
+            $district->a_manager_phone('区域联系电话');
+        });
 
         $show->s_name('门店名称');
         $show->s_manager('门店负责人姓名');
@@ -173,11 +177,10 @@ class ShopController extends Controller
         $show->s_created('创建时间');
         $show->s_updated('修改时间');
 
-		$show->panel()->tools(function ($tools) {
-			$tools->disableDelete(false);
-			$tools->disableEdit(false);
-			$tools->disableList(false);
-		});
+        $show->panel()->tools(function ($tools) {
+            $tools->disableEdit(false);
+            $tools->disableList(false);
+        });
 
         return $show;
     }
@@ -191,27 +194,92 @@ class ShopController extends Controller
     {
         $form = new Form(new Shop);
 
-        $form->select('s_account_id', '区域')->options('/admin/district/accounts_list')->loads(['a_city', 'a_manager', 'a_manager_phone'], [
-            '/admin/district/accounts_info/a_city',
-            '/admin/district/accounts_info/a_manager',
-            '/admin/district/accounts_info/a_manager_phone'
-        ])->rules('required', ['required' => '请选择区域']);
+        $account = Account::where('a_account', 'SC-CD')->first();
+        $shopCount = Shop::where('s_account_id', $account->a_id)->count();
 
-        $form->select('a_city', '城市');
-        $form->select('a_manager', '区域负责人姓名');
-        $form->select('a_manager_phone', '区域负责人联系电话');
-        $form->text('s_number', '门店序号')->rules('required', ['required' => '请输入门店序号']);
+        $form->text('s_district', '区域')->default($account->a_district)->disable();
+        $form->hidden('s_account_id')->value($account->a_id);
+        $number = pinyin($account->a_district) . str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
+        $form->text('s_number', '门店序号')->default($number)->disable();
+        $form->hidden('s_number')->value($number);
         $form->text('s_name', '门店名称')->rules('required', ['required' => '请输入门店名称']);
-        $form->text('s_manager', '门店负责人姓名')->rules('required', ['required' => '请输入门店联系人姓名']);
-        $form->text('s_manager_phone', '门店负责人电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
+        $form->text('s_city', '门店所在城市')->rules('required', ['required' => '请输入门店所在城市']);
+        $form->text('s_manager', '门店负责人')->rules('required', ['required' => '请输入门店联系人姓名']);
+        $form->text('s_manager_phone', '负责人电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
             'required' => '请输入门店负责人电话',
             'regex' => '电话号码非法'
         ]);
+        $form->text('s_address', '门店地址')->rules('required', ['required' => '请输入门店地址']);
         $form->password('s_password', '门店核销密码')->rules('required', ['required' => '请输入门店核销密码']);
         $form->switch('s_state', '是否停用')->states($this->states);
 
-        $form->ignore(['a_city', 'a_manager', 'a_manager_phone']);
+        $form->tools(function (Form\Tools $tools) {
+            $tools->disableDelete();
+        });
 
         return $form;
     }
+}
+
+/**
+ * 获取单个汉字拼音首字母。注意:此处不要纠结。汉字拼音是没有以U和V开头的
+ * @param $ch
+ * @return null|string
+ */
+function firstChar($ch) {
+    $char = ord($ch{0});
+    if ($char >= ord('A') and $char <= ord('z')) return strtoupper($ch{0});
+
+    $asc = ord($ch{0}) * 256 + ord($ch{1}) - 65536;
+    if ($asc >= -20319 and $asc <= -20284) return 'A';
+    if ($asc >= -20283 and $asc <= -19776) return 'B';
+    if ($asc >= -19775 and $asc <= -19219) return 'C';
+    if ($asc >= -19218 and $asc <= -18711) return 'D';
+    if ($asc >= -18710 and $asc <= -18527) return 'E';
+    if ($asc >= -18526 and $asc <= -18240) return 'F';
+    if ($asc >= -18239 and $asc <= -17923) return 'G';
+    if ($asc >= -17922 and $asc <= -17418) return 'H';
+    if ($asc >= -17922 and $asc <= -17418) return 'I';
+    if ($asc >= -17417 and $asc <= -16475) return 'J';
+    if ($asc >= -16474 and $asc <= -16213) return 'K';
+    if ($asc >= -16212 and $asc <= -15641) return 'L';
+    if ($asc >= -15640 and $asc <= -15166) return 'M';
+    if ($asc >= -15165 and $asc <= -14923) return 'N';
+    if ($asc >= -14922 and $asc <= -14915) return 'O';
+    if ($asc >= -14914 and $asc <= -14631) return 'P';
+    if ($asc >= -14630 and $asc <= -14150) return 'Q';
+    if ($asc >= -14149 and $asc <= -14091) return 'R';
+    if ($asc >= -14090 and $asc <= -13319) return 'S';
+    if ($asc >= -13318 and $asc <= -12839) return 'T';
+    if ($asc >= -12838 and $asc <= -12557) return 'W';
+    if ($asc >= -12556 and $asc <= -11848) return 'X';
+    if ($asc >= -11847 and $asc <= -11056) return 'Y';
+    if ($asc >= -11055 and $asc <= -10247) return 'Z';
+
+    return NULL;
+}
+
+/**
+ * 获取整条字符串所有汉字拼音首字母
+ * @param $zh
+ * @return string
+ */
+function pinyin($zh) {
+    $ret = '';
+    $s1 = iconv('UTF-8', 'gb2312', $zh);
+    $s2 = iconv('gb2312', 'UTF-8', $s1);
+    if ($s2 == $zh) {
+        $zh = $s1;
+    }
+    for ($i = 0; $i < strlen($zh); $i++) {
+        $s1 = substr($zh, $i, 1);
+        $p = ord($s1);
+        if ($p > 160) {
+            $s2 = substr($zh, $i++, 2);
+            $ret .= firstChar($s2);
+        } else {
+            $ret .= $s1;
+        }
+    }
+    return $ret;
 }

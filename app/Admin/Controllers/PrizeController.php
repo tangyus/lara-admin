@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controllers;
 
+use App\model\Account;
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Admin;
@@ -89,13 +90,14 @@ class PrizeController extends Controller
     {
         $grid = new Grid(new Prize());
 
+        $grid->p_id('ID');
         $grid->district()->a_district('区域')->expand(function ($model) {
             $info = $model->district()->get()->map(function ($item) {
                 return $item->only(['a_manager', 'a_manager_phone']);
             });
             return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
         });
-        $grid->p_type('礼品类型')->radio((new Prize())->prizeType);
+        $grid->p_type('礼品类型')->using((new Prize())->prizeType);
         $grid->p_name('礼品名称');
         $grid->p_point('兑换所需积分')->display(function () {
 			return (is_null($this->p_point) || $this->p_point == 0) ? '-' : $this->p_point;
@@ -103,17 +105,21 @@ class PrizeController extends Controller
         $grid->p_rate('中奖概率')->display(function () {
 			return is_null($this->p_rate) ? '-' : $this->p_rate . '%';
 		});
+        $grid->p_number('礼品数量');
         $grid->p_state('是否停用')->switch($this->states);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
 
         $grid->disableRowSelector();
+        $grid->actions(function ($actions) {
+            $actions->disableDelete();
+        });
 
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
 
             $filter->column(1 / 2, function ($filter) {
-                $filter->equal('p_account_id', '区域')->select('/admin/district/accounts_list');
+                $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
                 $filter->like('p_name', '礼品名称');
             });
             $filter->column(1 / 2, function ($filter) {
@@ -150,7 +156,6 @@ class PrizeController extends Controller
 		});
 
 		$show->panel()->tools(function ($tools) {
-			$tools->disableDelete(false);
 			$tools->disableEdit(false);
 			$tools->disableList(false);
 		});
@@ -167,17 +172,24 @@ class PrizeController extends Controller
     {
         $form = new Form(new Prize);
 
-        $form->select('p_account_id', '区域')
-            ->options('/admin/district/accounts_list')
-            ->rules('required', ['required' => '请选择区域']);
+        // $account = Account::where('a_account', Admin::user()->username)->first();
+        $account = Account::where('a_account', 'SC-CD')->first();
+        $form->text('a_district', '区域')->default($account->a_district)->disable();
+        $form->hidden('p_account_id')->value($account->a_id);
         $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
         $form->radio('p_type', '礼品类型')
             ->options((new Prize())->prizeType)
-            ->stacked()
-            ->default(1);
-        $form->switch('p_state', '是否停用')->states($this->states);
+            ->default(1)
+            ->rules('required', ['required' => '请选择礼品类型']);
+        $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
+        $form->textarea('p_detail', '礼品详情')->rules('required', ['required' => '请输入礼品详情']);
         $form->number('p_point', '兑换所需积分')->min(0)->default(0);
         $form->rate('p_rate', '中奖概率')->setWidth(1, 2);
+        $form->switch('p_state', '是否停用')->states($this->states);
+
+        $form->tools(function ($tools) {
+            $tools->disableDelete();
+        });
 
         return $form;
     }
