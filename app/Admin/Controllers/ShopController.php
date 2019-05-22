@@ -46,7 +46,6 @@ class ShopController extends Controller
      */
     public function show($id, Content $content)
     {
-        dd(1);
 //        Permission::check('shops.list');
 
         return $content

@@ -24,13 +24,14 @@ Route::group([
 
     // 区域门店管理
     $router->get('shops_list', 'ShopController@shopsList');
-    $router->get('shops', 'ShopController@index');
-    $router->get('shops/{shop}', 'ShopController@show');
-    $router->get('shops/create', 'ShopController@create');
-    $router->post('shops', 'ShopController@store');
-    $router->get('shops/{shop}/edit', 'ShopController@edit');
-    $router->put('shops/{shop}', 'ShopController@update');
-//    $router->resource('shops', ShopController::class, ['except' => ['destroy']]);
+//
+//    $router->get('shops', 'ShopController@index');
+//    $router->get('shops/{shop}', 'ShopController@show');
+//    $router->get('shops/create', 'ShopController@create');
+//    $router->post('shops', 'ShopController@store');
+//    $router->get('shops/{shop}/edit', 'ShopController@edit');
+//    $router->put('shops/{shop}', 'ShopController@update');
+    $router->resource('shops', ShopController::class, ['except' => ['destroy']]);
 
     // 区域礼品管理
     $router->resource('prizes', PrizeController::class);
