@@ -30,10 +30,15 @@ class ShopController extends Controller
      */
     public function index(Content $content)
     {
-//        dd(Admin::user()->can('shops.show'));
+        Permission::check('shops.list');
+
         return $content
-            ->header('门店信息管理')
-            ->description('区域门店')
+            ->header('区域门店')
+            ->description('门店列表')
+            ->breadcrumb(
+                ['text' => '区域门店', 'url' => '/shops'],
+                ['text' => '门店列表']
+            )
             ->body($this->grid());
     }
 
@@ -46,11 +51,15 @@ class ShopController extends Controller
      */
     public function show($id, Content $content)
     {
-//        Permission::check('shops.list');
+        Permission::check('shops.list');
 
         return $content
             ->header('区域门店')
             ->description('详情')
+            ->breadcrumb(
+                ['text' => '区域门店', 'url' => '/shops'],
+                ['text' => '详情']
+            )
             ->body($this->detail($id));
     }
 
@@ -63,10 +72,17 @@ class ShopController extends Controller
      */
     public function edit($id, Content $content)
     {
+        Permission::check('shops.create');
+
         return $content
             ->header('区域门店')
             ->description('编辑')
-            ->body($this->form()->edit($id));
+            ->breadcrumb(
+                ['text' => '区域门店', 'url' => '/shops'],
+                ['text' => $id],
+                ['text' => '编辑']
+            )
+            ->body($this->form($id)->edit($id));
     }
 
     /**
@@ -77,12 +93,17 @@ class ShopController extends Controller
      */
     public function create(Content $content)
     {
+        Permission::check('shops.create');
+
         return $content
             ->header('区域门店')
             ->description('新建')
+            ->breadcrumb(
+                ['text' => '区域门店', 'url' => '/shops'],
+                ['text' => '新建']
+            )
             ->body($this->form());
     }
-
 
     public function shopsList()
     {
@@ -102,49 +123,59 @@ class ShopController extends Controller
 
         $grid->s_id('ID');
         $grid->s_number('门店序号');
-        $grid->district()->a_district('区域');
-        $grid->district()->a_city('城市');
-        $grid->district()->a_manager('区域负责人姓名');
-        $grid->district()->a_manager_phone('区域联系电话');
+        if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $grid->district()->a_district('区域');
+            $grid->district()->a_city('城市');
+            $grid->district()->a_manager('区域负责人姓名');
+            $grid->district()->a_manager_phone('区域联系电话');
+
+            // 数据查询过滤
+            $grid->filter(function ($filter) {
+                $filter->disableIdFilter();
+
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
+
+                    $filter->where(function ($query) {
+                        $query->whereHas('district', function ($query) {
+                            $query->where('a_city', $this->input);
+                        });
+                    }, '城市');
+
+                    $filter->where(function ($query) {
+                        $query->whereHas('district', function ($query) {
+                            $query->where('a_manager_phone', $this->input);
+                        });
+                    }, '区域联系电话');
+                });
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('s_number', '门店序号');
+                    $filter->like('s_name', '门店名称');
+                    $filter->equal('s_manager_phone', '门店联系电话');
+                });
+            });
+        } else {
+            $grid->disableFilter();
+        }
         $grid->s_name('门店名称');
         $grid->s_manager('门店负责人姓名');
         $grid->s_manager_phone('门店负责人电话');
         $grid->s_password('密码');
-        $grid->s_state('是否停用')->switch($this->states);
+        if (Admin::user()->cannot('qrcodes.create')) {
+            $grid->s_state('是否停用')->using(['否', '是']);
+            $grid->disableCreateButton();
+        } else {
+            $grid->s_state('是否停用')->switch($this->states);
+        }
         $grid->s_created('创建时间');
         $grid->s_updated('修改时间');
 
         $grid->disableRowSelector();
         $grid->actions(function ($actions) {
             $actions->disableDelete();
-        });
-
-        // 数据查询过滤
-        $grid->filter(function ($filter) {
-            $filter->disableIdFilter();
-
-            $filter->column(1 / 2, function ($filter) {
-                $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
-
-                $filter->where(function ($query) {
-                    $query->whereHas('district', function ($query) {
-                        $query->where('a_city', $this->input);
-                    });
-
-                }, '城市');
-
-                $filter->where(function ($query) {
-                    $query->whereHas('district', function ($query) {
-                        $query->where('a_manager_phone', $this->input);
-                    });
-
-                }, '区域联系电话');
-            });
-            $filter->column(1 / 2, function ($filter) {
-                $filter->equal('s_number', '门店序号');
-                $filter->like('s_name', '门店名称');
-                $filter->equal('s_manager_phone', '门店联系电话');
-            });
+            if (Admin::user()->cannot('qrcodes.create')) {
+                $actions->disableEdit();
+            }
         });
 
         return $grid;
@@ -161,14 +192,17 @@ class ShopController extends Controller
         $show = new Show(Shop::findOrFail($id));
 
         $show->s_number('门店序号');
-        $show->district('区域', function ($district) {
-            $district->a_district('区域');
-            $district->a_city('城市');
-            $district->a_manager('区域负责人姓名');
-            $district->a_manager_phone('区域联系电话');
-        });
+        if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $show->district('区域', function ($district) {
+                $district->a_district('区域');
+                $district->a_city('城市');
+                $district->a_manager('区域负责人姓名');
+                $district->a_manager_phone('区域联系电话');
+            });
+        }
 
         $show->s_name('门店名称');
+        $show->s_number('门店序号');
         $show->s_manager('门店负责人姓名');
         $show->s_manager_phone('门店负责人电话');
         $show->s_password('门店核销密码');
@@ -177,7 +211,9 @@ class ShopController extends Controller
         $show->s_updated('修改时间');
 
         $show->panel()->tools(function ($tools) {
-            $tools->disableEdit(false);
+            if (Admin::user()->can('qrcodes.create')) {
+                $tools->disableEdit(false);
+            }
             $tools->disableList(false);
         });
 
@@ -189,24 +225,35 @@ class ShopController extends Controller
      *
      * @return Form
      */
-    protected function form()
+    protected function form($id = 0)
     {
         $form = new Form(new Shop);
 
-        $account = Account::where('a_account', 'SC-CD')->first();
-        $shopCount = Shop::where('s_account_id', $account->a_id)->count();
+        if ($id) {
+            $form->text('district.a_district', '区域')->disable();
+            $form->text('s_number', '门店序号')->disable();
+        } else {
+            if (Admin::user()->isRole('市场人员')) {
+                $account = Account::where('a_account', Admin::user()->username)->first();
+                $form->text('s_district', '区域')->default($account->a_district)->disable();
+                $form->hidden('s_account_id')->value($account->a_id);
+                $shopCount = Shop::where('s_account_id', $account->a_id)->count();
 
-        $form->text('s_district', '区域')->default($account->a_district)->disable();
-        $form->hidden('s_account_id')->value($account->a_id);
-        $number = pinyin($account->a_district) . str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
-        $form->text('s_number', '门店序号')->default($number)->disable();
-        $form->hidden('s_number')->value($number);
+                $number = pinyin($account->a_district) . str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
+                $form->text('s_number', '门店序号')->default($number)->disable();
+                $form->hidden('s_number')->value($number);
+            } else {
+                $form->select('s_account_id', '区域')->options('/admin/accounts_list')->rules('required', ['required' => '请选择区域']);
+                $form->text('s_number', '门店序号')->rules('required', ['required' => '请输入门店序号']);
+            }
+        }
+
         $form->text('s_name', '门店名称')->rules('required', ['required' => '请输入门店名称']);
         $form->text('s_city', '门店所在城市')->rules('required', ['required' => '请输入门店所在城市']);
         $form->text('s_manager', '门店负责人')->rules('required', ['required' => '请输入门店联系人姓名']);
         $form->text('s_manager_phone', '负责人电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
-            'required' => '请输入门店负责人电话',
-            'regex' => '电话号码非法'
+            'required'  => '请输入门店负责人电话',
+            'regex'     => '电话号码非法'
         ]);
         $form->text('s_address', '门店地址')->rules('required', ['required' => '请输入门店地址']);
         $form->password('s_password', '门店核销密码')->rules('required', ['required' => '请输入门店核销密码']);

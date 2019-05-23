@@ -2,7 +2,9 @@
 
 namespace App\Admin\Controllers;
 
+use App\Admin\Extensions\AccountExporter;
 use App\model\Account;
+use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
@@ -34,9 +36,15 @@ class AccountController
 	 */
     public function index(Content $content)
     {
+        Permission::check('accounts.all');
+
         return $content
-            ->header('门店信息管理')
-            ->description('区域账号')
+            ->header('区域账号')
+            ->description('账号列表')
+            ->breadcrumb(
+                ['text' => '区域账号', 'url' => '/accounts'],
+                ['text' => '账号列表']
+            )
             ->body($this->grid());
     }
 
@@ -49,9 +57,15 @@ class AccountController
      */
     public function show($id, Content $content)
     {
+        Permission::check('accounts.all');
+
         return $content
             ->header('区域账号')
             ->description('详情')
+            ->breadcrumb(
+                ['text' => '区域账号', 'url' => '/accounts'],
+                ['text' => '详情']
+            )
             ->body($this->detail($id));
     }
 
@@ -63,9 +77,15 @@ class AccountController
      */
     public function create(Content $content)
     {
+        Permission::check('accounts.all');
+
         return $content
             ->header('区域账号')
             ->description('创建')
+            ->breadcrumb(
+                ['text' => '区域账号', 'url' => '/accounts'],
+                ['text' => '创建']
+            )
             ->body($this->form());
     }
 
@@ -78,9 +98,16 @@ class AccountController
      */
     public function edit($id, Content $content)
     {
+        Permission::check('accounts.all');
+
         return $content
             ->header('区域账号')
             ->description('编辑')
+            ->breadcrumb(
+                ['text' => '区域账号', 'url' => '/accounts'],
+                ['text' => $id],
+                ['text' => '编辑']
+            )
             ->body($this->form()->edit($id));
     }
 
@@ -133,7 +160,6 @@ class AccountController
         $show->a_updated('修改时间');
 
         $show->panel()->tools(function ($tools) {
-        	$tools->disableDelete(false);
 			$tools->disableEdit(false);
 			$tools->disableList(false);
 		});
@@ -149,6 +175,7 @@ class AccountController
     protected function grid()
     {
         $grid = new Grid(new Account());
+        $grid->exporter(new AccountExporter());
 
         $grid->a_id('ID');
         $grid->a_district('区域');
@@ -162,6 +189,9 @@ class AccountController
         $grid->a_updated('修改时间');
 
         $grid->disableRowSelector();
+        $grid->actions(function ($actions) {
+            $actions->disableDelete();
+        });
 
         // 数据查询过滤
         $grid->filter(function ($filter) {
@@ -197,6 +227,10 @@ class AccountController
         $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
         $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
         $form->switch('a_state', '是否停用')->states($this->states);
+
+        $form->tools(function ($tools) {
+            $tools->disableDelete();
+        });
 
         return $form;
     }

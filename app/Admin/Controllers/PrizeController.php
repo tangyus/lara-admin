@@ -5,8 +5,9 @@ namespace App\Admin\Controllers;
 use App\model\Account;
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
-use Encore\Admin\Admin;
+use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
@@ -30,9 +31,15 @@ class PrizeController extends Controller
      */
     public function index(Content $content)
     {
+        Permission::check('prizes.list');
+
         return $content
-            ->header('门店信息管理')
-            ->description('区域礼品')
+            ->header('区域礼品')
+            ->description('礼品列表')
+            ->breadcrumb(
+                ['text' => '区域礼品', 'url' => '/prizes'],
+                ['text' => '礼品列表']
+            )
             ->body($this->grid());
     }
 
@@ -45,9 +52,15 @@ class PrizeController extends Controller
      */
     public function show($id, Content $content)
     {
+        Permission::check('prizes.list');
+
         return $content
             ->header('区域礼品')
             ->description('详情')
+            ->breadcrumb(
+                ['text' => '区域礼品', 'url' => '/prizes'],
+                ['text' => '详情']
+            )
             ->body($this->detail($id));
     }
 
@@ -60,10 +73,17 @@ class PrizeController extends Controller
      */
     public function edit($id, Content $content)
     {
+        Permission::check('prizes.create');
+
         return $content
             ->header('区域礼品')
             ->description('编辑')
-            ->body($this->form()->edit($id));
+            ->breadcrumb(
+                ['text' => '区域礼品', 'url' => '/prizes'],
+                ['text' => $id],
+                ['text' => '编辑']
+            )
+            ->body($this->form($id)->edit($id));
     }
 
     /**
@@ -74,10 +94,15 @@ class PrizeController extends Controller
      */
     public function create(Content $content)
     {
+        Permission::check('prizes.create');
 
         return $content
             ->header('区域礼品')
             ->description('创建')
+            ->breadcrumb(
+                ['text' => '区域礼品', 'url' => '/prizes'],
+                ['text' => '创建']
+            )
             ->body($this->form());
     }
 
@@ -91,12 +116,27 @@ class PrizeController extends Controller
         $grid = new Grid(new Prize());
 
         $grid->p_id('ID');
-        $grid->district()->a_district('区域')->expand(function ($model) {
-            $info = $model->district()->get()->map(function ($item) {
-                return $item->only(['a_manager', 'a_manager_phone']);
+        if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $grid->district()->a_district('区域')->expand(function ($model) {
+                $info = $model->district()->get()->map(function ($item) {
+                    return $item->only(['a_manager', 'a_manager_phone']);
+                });
+                return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
-            return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
-        });
+            $grid->filter(function ($filter) {
+                $filter->disableIdFilter();
+
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
+                    $filter->like('p_name', '礼品名称');
+                });
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('p_type', '礼品类型')->radio((new Prize())->prizeType)->stacked();
+                });
+            });
+        } else {
+            $grid->disableFilter();
+        }
         $grid->p_type('礼品类型')->using((new Prize())->prizeType);
         $grid->p_name('礼品名称');
         $grid->p_point('兑换所需积分')->display(function () {
@@ -106,25 +146,30 @@ class PrizeController extends Controller
 			return is_null($this->p_rate) ? '-' : $this->p_rate . '%';
 		});
         $grid->p_number('礼品数量');
-        $grid->p_state('是否停用')->switch($this->states);
+        if (Admin::user()->cannot('prizes.create')) {
+            $grid->p_state('是否停用')->using(['否', '是']);
+            $grid->disableCreateButton();
+            $grid->actions(function ($actions) {
+                $actions->disableDelete();
+            });
+        } else {
+            $grid->p_state('是否停用')->switch($this->states);
+        }
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
 
         $grid->disableRowSelector();
+        if (Admin::user()->cannot('prizes.create')) {
+            $grid->disableCreateButton();
+            $grid->actions(function ($actions) {
+                $actions->disableEdit(false);
+            });
+        }
         $grid->actions(function ($actions) {
             $actions->disableDelete();
-        });
-
-        $grid->filter(function ($filter) {
-            $filter->disableIdFilter();
-
-            $filter->column(1 / 2, function ($filter) {
-                $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
-                $filter->like('p_name', '礼品名称');
-            });
-            $filter->column(1 / 2, function ($filter) {
-                $filter->equal('p_type', '礼品类型')->radio((new Prize())->prizeType)->stacked();
-            });
+            if (Admin::user()->cannot('prizes.create')) {
+                $actions->disableEdit();
+            }
         });
 
         return $grid;
@@ -168,14 +213,22 @@ class PrizeController extends Controller
      *
      * @return Form
      */
-    protected function form()
+    protected function form($id = 0)
     {
         $form = new Form(new Prize);
 
-        // $account = Account::where('a_account', Admin::user()->username)->first();
-        $account = Account::where('a_account', 'SC-CD')->first();
-        $form->text('a_district', '区域')->default($account->a_district)->disable();
-        $form->hidden('p_account_id')->value($account->a_id);
+        if ($id) {
+            $form->text('district.a_district', '区域')->disable();
+        } else {
+            if (Admin::user()->isRole('市场人员')) {
+                $account = Account::where('a_account', Admin::user()->username)->first();
+                $form->text('a_district', '区域')->default($account->a_district)->disable();
+                $form->hidden('p_account_id')->value($account->a_id);
+            } else {
+                $form->select('p_account_id', '区域')->options('/admin/accounts_list');
+            }
+        }
+
         $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
         $form->radio('p_type', '礼品类型')
             ->options((new Prize())->prizeType)

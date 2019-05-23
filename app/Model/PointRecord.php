@@ -16,11 +16,6 @@ class PointRecord extends Model
         return $this->belongsTo(User::class, 'pr_uid');
     }
 
-    public function prize()
-    {
-        return $this->belongsTo(Prize::class, 'pr_prize_id');
-    }
-
     public function shop()
     {
         return $this->belongsTo(Shop::class, 'pr_shop_id');

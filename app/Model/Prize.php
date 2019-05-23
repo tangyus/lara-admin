@@ -17,6 +17,12 @@ class Prize extends Model
         3 => '闪电积分礼',
         4 => '闪电会员礼'
     ];
+    public $prizeTypeLabel = [
+        1 => 'info',
+        2 => 'primary',
+        3 => 'success',
+        4 => 'default'
+    ];
 
     public function district()
     {

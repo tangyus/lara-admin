@@ -14,30 +14,26 @@ Route::group([
 
     // 二维码管理
     $router->get('qrcodes/download', 'QrcodeController@download');
-    $router->resource('qrcodes', QrcodeController::class);
+    $router->resource('qrcodes', QrcodeController::class, ['only' => ['index', 'create', 'store']]);
 
     // 区域账号管理
     $router->get('accounts_list', 'AccountController@accountsList');
     $router->get('accounts_cities/{account_id}', 'AccountController@accountsCities');
     $router->get('accounts_info/{type}', 'AccountController@accountsDetail');
-    $router->resource('accounts', AccountController::class);
+    $router->resource('accounts', AccountController::class, ['except' => ['destroy']]);
 
     // 区域门店管理
     $router->get('shops_list', 'ShopController@shopsList');
-//
-//    $router->get('shops', 'ShopController@index');
-//    $router->get('shops/{shop}', 'ShopController@show');
-//    $router->get('shops/create', 'ShopController@create');
-//    $router->post('shops', 'ShopController@store');
-//    $router->get('shops/{shop}/edit', 'ShopController@edit');
-//    $router->put('shops/{shop}', 'ShopController@update');
     $router->resource('shops', ShopController::class, ['except' => ['destroy']]);
 
     // 区域礼品管理
-    $router->resource('prizes', PrizeController::class);
+    $router->resource('prizes', PrizeController::class, ['except' => ['destroy']]);
 
     // 用户管理
     $router->get('users/point_record', 'UserController@pointRecord');
     $router->get('users/point_record/{id}', 'UserController@pointRecordShow');
-    $router->resource('users', UserController::class);
+    $router->resource('users', UserController::class, ['only' => ['index', 'show']]);
+
+//    $router->get('data/act', 'PrizeController@data');
+//    $router->get('data/stats', 'StatsController@data');
 });
