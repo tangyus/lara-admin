@@ -12,16 +12,10 @@ class Prize extends Model
     protected $primaryKey = 'p_id';
 
     public $prizeType = [
-        1 => '闪电进阶礼',
-        2 => '闪电传奇礼',
-        3 => '闪电积分礼',
-        4 => '闪电会员礼'
-    ];
-    public $prizeTypeLabel = [
-        1 => 'info',
-        2 => 'primary',
-        3 => 'success',
-        4 => 'default'
+        '闪电进阶礼' => '闪电进阶礼',
+        '闪电传奇礼' => '闪电传奇礼',
+        '闪电积分礼' => '闪电积分礼',
+        '闪电会员礼' => '闪电会员礼'
     ];
 
     public function district()

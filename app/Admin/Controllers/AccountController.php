@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Admin\Extensions\AccountExporter;
 use App\model\Account;
+use Carbon\Carbon;
 use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Form;
@@ -26,14 +27,14 @@ class AccountController
         '江苏' => '江苏'
     ];
     protected $states = [
-        'on'  => ['value' => 1, 'text' => '是', 'color' => 'primary'],
+        'on' => ['value' => 1, 'text' => '是', 'color' => 'primary'],
         'off' => ['value' => 0, 'text' => '否', 'color' => 'default'],
     ];
 
-	/**
-	 * @param Content $content
-	 * @return Content
-	 */
+    /**
+     * @param Content $content
+     * @return Content
+     */
     public function index(Content $content)
     {
         Permission::check('accounts.all');
@@ -108,9 +109,15 @@ class AccountController
                 ['text' => $id],
                 ['text' => '编辑']
             )
-            ->body($this->form()->edit($id));
+            ->body($this->form($id)->edit($id));
     }
 
+    /**
+     * 获取区域详情信息
+     * @param Request $request
+     * @param $type
+     * @return array
+     */
     public function accountsDetail(Request $request, $type)
     {
         $districtId = $request->get('q');
@@ -123,6 +130,10 @@ class AccountController
         }
     }
 
+    /**
+     * 获取区域列表
+     * @return array
+     */
     public function accountsList()
     {
         $accounts = Account::get(['a_id as id', 'a_district as text']);
@@ -130,6 +141,11 @@ class AccountController
         return $accounts ? $accounts : $this->districts;
     }
 
+    /**
+     * 获取某一个区域下的所有城市列表
+     * @param $id
+     * @return mixed
+     */
     public function accountsCities($id)
     {
         $account = Account::select(DB::raw('a_id as id, a_city as text'))
@@ -160,9 +176,9 @@ class AccountController
         $show->a_updated('修改时间');
 
         $show->panel()->tools(function ($tools) {
-			$tools->disableEdit(false);
-			$tools->disableList(false);
-		});
+            $tools->disableEdit(false);
+            $tools->disableList(false);
+        });
 
         return $show;
     }
@@ -197,12 +213,12 @@ class AccountController
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
 
-            $filter->column(1/2, function ($filter) {
-				$filter->equal('a_district', '区域')->select('/admin/accounts_list');
-			});
-			$filter->column(1/2, function ($filter) {
-				$filter->equal('a_manager', '区域负责人姓名');
-			});
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('a_district', '区域')->select('/admin/accounts_list');
+            });
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('a_manager', '区域负责人姓名');
+            });
         });
 
         return $grid;
@@ -213,21 +229,38 @@ class AccountController
      *
      * @return Form
      */
-    protected function form()
+    protected function form($id = 0)
     {
         $form = new Form(new Account());
 
-        $form->select('a_district', '区域')->options($this->districts)->rules('required', ['required' => '请选择区域']);
-        $form->text('a_city', '城市')->rules('required', ['required' => '请输入城市']);
+        if (!$id) {
+            $form->select('a_district', '区域')->options($this->districts)->rules('required', ['required' => '请选择区域']);
+            $form->text('a_city', '城市')->rules('required', ['required' => '请输入城市']);
+            $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
+
+            // 添加后台登录账号和角色
+            $form->saved(function (Form $form) {
+                $userId = DB::table('admin_users')->insertGetId([
+                    'username'      => $form->input('a_account'),
+                    'password'      => bcrypt($form->input('a_password')),
+                    'name'          => $form->input('a_district') . '区域市场人员',
+                    'created_at'    => Carbon::now(),
+                    'updated_at'    => Carbon::now(),
+                ]);
+
+                DB::table('admin_role_users')->insert([
+                    'role_id' => 3,
+                    'user_id' => $userId
+                ]);
+            });
+        }
         $form->text('a_manager', '区域负责人姓名')->rules('required', ['required' => '请输入区域负责人姓名']);
         $form->text('a_manager_phone', '区域联系电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
-            'required' => '请输入区域联系电话',
-            'regex' => '电话号码非法'
+            'required'  => '请输入区域联系电话',
+            'regex'     => '电话号码非法'
         ]);
-        $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
         $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
         $form->switch('a_state', '是否停用')->states($this->states);
-
         $form->tools(function ($tools) {
             $tools->disableDelete();
         });

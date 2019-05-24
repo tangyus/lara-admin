@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Admin\Extensions\QrcodeExporter;
 use App\model\Account;
+use App\model\Code;
 use App\Model\Qrcode;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Auth\Permission;
@@ -12,6 +13,7 @@ use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
+use Illuminate\Support\Facades\DB;
 
 class QrcodeController extends Controller
 {
@@ -62,11 +64,6 @@ class QrcodeController extends Controller
             ->body($this->form());
     }
 
-    public function download()
-    {
-        dd(1);
-    }
-
     /**
      * Make a grid builder.
      *
@@ -75,6 +72,11 @@ class QrcodeController extends Controller
     protected function grid()
     {
         $grid = new Grid(new Qrcode);
+        if (Admin::user()->isRole('市场人员')) {
+            // 修改数据来源
+            $account = Account::where('a_account', Admin::user()->username)->first();
+            $grid->model()->where('q_account_id', $account->a_id);
+        }
         $grid->exporter(new QrcodeExporter());
 
         $grid->q_id('ID');
@@ -96,7 +98,15 @@ class QrcodeController extends Controller
         if (Admin::user()->cannot('qrcodes.create')) {
             $grid->disableCreateButton();
         }
-        $grid->disableActions();
+
+        $grid->actions(function ($actions) {
+            $actions->disableEdit();
+            $actions->disableDelete();
+            $actions->disableView();
+
+            $row = $actions->row;
+            $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
+        });
 
         return $grid;
     }
@@ -110,21 +120,59 @@ class QrcodeController extends Controller
     {
         $form = new Form(new Qrcode);
 
-        $account = Account::where('a_account', Admin::user()->username)->first();
-        $accounts = Account::where('a_account', 'SC-CD')->get();
-        $cities = [];
-        foreach ($accounts as $account) {
-            $cities[$account->a_city] = $account->a_city;
+        if (Admin::user()->isRole('市场人员')) {
+            $form->hidden('q_account_id');
+            $account = Account::where('a_account', Admin::user()->username)->first();
+            $form->saving(function ($form) use ($account) {
+                $form->input('q_account_id', $account->a_id);
+            });
+
+            $form->text('q_district', '区域')->default($account->a_district)->attribute(['disabled' => true]);
+        } else {
+            $form->select('q_account_id', '区域')->options('/admin/accounts_list')->rules('required', ['required' => '请选择区域']);
         }
 
-        $form->text('q_district', '区域')->default($account->a_district)->attribute(['disabled' => true]);
-        $form->hidden('q_account_id')->value($account->a_id);
-        $form->select('q_city', '城市')->options($cities);
-        $form->text('q_number', '生成数量');
-        $form->datetime('q_expired', '二维码有效期');
-        $form->radio('q_member_date', '会员日')->options($this->memberDate);
+        $form->text('q_city', '城市')->rules('required', ['required' => '请输入城市']);
+        $form->text('q_number', '生成数量')->rules('required', ['required' => '请输入生成数量']);
+        $form->datetime('q_expired', '二维码有效期')->rules('required', ['required' => '请选择二维码有效期']);
+        $form->radio('q_member_date', '会员日')->options($this->memberDate)->rules('required', ['required' => '请选择会员日']);
         $form->number('q_point', '扫码积分')->min(5)->default(5);
 
+        $form->ignore('q_district');
+
+        // 下载导出二维码
+        $form->saved(function (Form $form) {
+            $this->zipCodes($form->model());
+        });
+
         return $form;
+    }
+
+    protected function zipCodes($model)
+    {
+        $codes = Code::whereNull('c_qrcode_id')->limit($model->q_number)->get();
+        if (count($codes) > 0) {
+            $publicPath = public_path();
+            $path = $publicPath . '/download/codes';
+            $zipPath = $path . "/{$model->q_id}.zip";
+            $ids = [];
+
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE) === TRUE) {
+                foreach ($codes as $codeFile) {
+                    if (file_exists($publicPath . $codeFile->c_path)) {
+                        // 将文件加入zip对象
+                        $ids[] = $codeFile['c_id'];
+                        $zip->addFile($publicPath . '/' . $codeFile->c_path, $codeFile->c_filename);
+                    }
+                }
+                $zip->close(); // 关闭处理的zip文件
+
+                Code::whereIn('c_id', $ids)->limit($model->q_number)->update(['c_qrcode_id' => $model->q_id]);
+
+                $model->q_zip_path = "/download/codes/{$model->q_id}.zip";
+                $model->save();
+            }
+        }
     }
 }

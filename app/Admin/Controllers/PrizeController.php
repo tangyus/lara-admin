@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controllers;
 
+use App\Admin\Extensions\PrizeExporter;
 use App\model\Account;
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
@@ -106,6 +107,11 @@ class PrizeController extends Controller
             ->body($this->form());
     }
 
+    public function data()
+    {
+        echo '活动数据正在开发中';
+    }
+
     /**
      * Make a grid builder.
      *
@@ -114,6 +120,12 @@ class PrizeController extends Controller
     protected function grid()
     {
         $grid = new Grid(new Prize());
+        if (Admin::user()->isRole('市场人员')) {
+            // 修改数据来源
+            $account = Account::where('a_account', Admin::user()->username)->first();
+            $grid->model()->where('p_account_id', $account->a_id);
+        }
+        $grid->exporter(new PrizeExporter());
 
         $grid->p_id('ID');
         if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
@@ -223,17 +235,18 @@ class PrizeController extends Controller
             if (Admin::user()->isRole('市场人员')) {
                 $account = Account::where('a_account', Admin::user()->username)->first();
                 $form->text('a_district', '区域')->default($account->a_district)->disable();
-                $form->hidden('p_account_id')->value($account->a_id);
+                $form->hidden('p_account_id');
+
+                $form->saving(function (Form $form) use ($account) {
+                    $form->input('p_account_id', $account->a_id);
+                });
             } else {
                 $form->select('p_account_id', '区域')->options('/admin/accounts_list');
             }
         }
 
         $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
-        $form->radio('p_type', '礼品类型')
-            ->options((new Prize())->prizeType)
-            ->default(1)
-            ->rules('required', ['required' => '请选择礼品类型']);
+        $form->radio('p_type', '礼品类型')->options((new Prize())->prizeType)->rules('required', ['required' => '请选择礼品类型']);
         $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
         $form->textarea('p_detail', '礼品详情')->rules('required', ['required' => '请输入礼品详情']);
         $form->number('p_point', '兑换所需积分')->min(0)->default(0);

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controllers;
 
+use App\Admin\Extensions\ShopExporter;
 use App\model\Account;
 use App\Model\Shop;
 use App\Http\Controllers\Controller;
@@ -120,6 +121,12 @@ class ShopController extends Controller
     protected function grid()
     {
         $grid = new Grid(new Shop);
+        if (Admin::user()->isRole('市场人员')) {
+            // 修改数据来源
+            $account = Account::where('a_account', Admin::user()->username)->first();
+            $grid->model()->where('s_account_id', $account->a_id);
+        }
+        $grid->exporter(new ShopExporter());
 
         $grid->s_id('ID');
         $grid->s_number('门店序号');
@@ -160,7 +167,7 @@ class ShopController extends Controller
         $grid->s_name('门店名称');
         $grid->s_manager('门店负责人姓名');
         $grid->s_manager_phone('门店负责人电话');
-        $grid->s_password('密码');
+        $grid->s_password('门店核销密码');
         if (Admin::user()->cannot('qrcodes.create')) {
             $grid->s_state('是否停用')->using(['否', '是']);
             $grid->disableCreateButton();
@@ -236,12 +243,17 @@ class ShopController extends Controller
             if (Admin::user()->isRole('市场人员')) {
                 $account = Account::where('a_account', Admin::user()->username)->first();
                 $form->text('s_district', '区域')->default($account->a_district)->disable();
-                $form->hidden('s_account_id')->value($account->a_id);
                 $shopCount = Shop::where('s_account_id', $account->a_id)->count();
+                $form->hidden('s_account_id');
+                $form->hidden('s_number');
 
                 $number = pinyin($account->a_district) . str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
                 $form->text('s_number', '门店序号')->default($number)->disable();
-                $form->hidden('s_number')->value($number);
+
+                $form->saving(function (Form $form) use ($account, $number) {
+                    $form->input('s_account_id', $account->a_id);
+                    $form->input('s_number', $number);
+                });
             } else {
                 $form->select('s_account_id', '区域')->options('/admin/accounts_list')->rules('required', ['required' => '请选择区域']);
                 $form->text('s_number', '门店序号')->rules('required', ['required' => '请输入门店序号']);
