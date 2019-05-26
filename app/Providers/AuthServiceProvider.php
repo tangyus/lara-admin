@@ -2,8 +2,9 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Gate;
+use App\Model\User;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Auth;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -25,6 +26,15 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        $where['u_token'] = request()->header('s3rd', '');
+        if (!empty(request()->input('city'))) {
+			// 城市切换
+			$where['u_city'] = request()->input('city');
+		}
+
+		$user = User::where($where)->first();
+        if ($user) {
+			Auth::setUser($user);
+		}
     }
 }
