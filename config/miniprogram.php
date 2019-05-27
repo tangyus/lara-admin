@@ -1,7 +1,8 @@
 <?php
 return [
-	'app_id' => 'wxfe49d510a7e7853b',
-	'secret' => '2aadf5a404e444e45408adafee76f2a0',
+    // 医路向前 wx4ac67a654ba9a4be dda090908b78b71aac95c3acad49f1fc
+	'app_id' => 'wx4ac67a654ba9a4be',
+	'secret' => 'dda090908b78b71aac95c3acad49f1fc',
 
 	// 下面为可选项
 	// 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名

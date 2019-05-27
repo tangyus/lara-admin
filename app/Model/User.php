@@ -10,6 +10,8 @@ class User extends Authenticatable
     use Notifiable;
 
     protected $primaryKey = 'u_id';
+    const CREATED_AT = 'u_created';
+    const UPDATED_AT = 'u_updated';
 
     public function district()
     {

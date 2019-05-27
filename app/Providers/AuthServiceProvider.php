@@ -27,9 +27,9 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         $where['u_token'] = request()->header('s3rd', '');
-        if (!empty(request()->input('city'))) {
+        if (!empty(request()->header('city', ''))) {
 			// 城市切换
-			$where['u_city'] = request()->input('city');
+			$where['u_city'] = request()->header('city');
 		}
 
 		$user = User::where($where)->first();
