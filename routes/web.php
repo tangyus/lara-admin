@@ -24,10 +24,16 @@ Route::group([
 		$router->post('info', 'ApiController@info');
 		$router->post('point_record', 'ApiController@pointRecord');
 		$router->post('point_receive', 'ApiController@pointReceive');
-		$router->post('lottery', 'ApiController@lottery');
-	});
-});
 
-Route::get('/', function () {
-    return view('welcome');
+		// 抽奖
+		$router->post('lottery_prize', 'ApiController@lotteryPrizes');
+		$router->post('lottery', 'ApiController@lottery');
+		$router->post('user_lottery_prize', 'ApiController@userLotteryPrizeList');
+		$router->post('store_address', 'ApiController@storeUserPrizeAddress');
+
+		// 兑换
+        $router->post('exchange_prize', 'ApiController@exchangePrizes');
+        $router->post('exchange', 'ApiController@exchange');
+        $router->post('user_exchange_prize', 'ApiController@userExchangePrizeList');
+	});
 });

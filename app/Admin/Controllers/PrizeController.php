@@ -107,11 +107,6 @@ class PrizeController extends Controller
             ->body($this->form());
     }
 
-    public function data()
-    {
-        echo '活动数据正在开发中';
-    }
-
     /**
      * Make a grid builder.
      *
@@ -167,6 +162,8 @@ class PrizeController extends Controller
         } else {
             $grid->p_state('是否停用')->switch($this->states);
         }
+        $grid->p_img('礼品图')->image('', 100, 100);
+        $grid->p_thumb('礼品缩略图')->image('', 100, 100);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
 
@@ -206,11 +203,13 @@ class PrizeController extends Controller
 			return (is_null($point) || $point == 0) ? '-' : $point;
 		});
         $show->p_state('是否停用')->using([0 => '否', 1 => '是']);
+        $show->p_rate('中奖概率')->as(function ($rate) {
+            return is_null($rate) ? '-' : $rate . '%';
+        });
+        $show->p_img('礼品图')->image();
+        $show->p_thumb('礼品缩略图')->image();
         $show->p_created('创建时间');
         $show->p_updated('修改时间');
-        $show->p_rate('中奖概率')->as(function ($rate) {
-        	return is_null($rate) ? '-' : $rate . '%';
-		});
 
 		$show->panel()->tools(function ($tools) {
 			$tools->disableEdit(false);
@@ -252,6 +251,8 @@ class PrizeController extends Controller
         $form->number('p_point', '兑换所需积分')->min(0)->default(0);
         $form->rate('p_rate', '中奖概率')->setWidth(1, 2);
         $form->switch('p_state', '是否停用')->states($this->states);
+        $form->image('p_img', '礼品图')->move('prizes');
+        $form->image('p_thumb', '礼品缩略图')->move('prizes');
 
         $form->tools(function ($tools) {
             $tools->disableDelete();

@@ -5,10 +5,10 @@ namespace App\Admin\Controllers;
 use App\Admin\Extensions\PointRecordExporter;
 use App\Admin\Extensions\UserExporter;
 use App\Model\PointRecord;
-use App\model\Prize;
 use App\Model\User;
 use App\Http\Controllers\Controller;
 use Encore\Admin\Controllers\HasResourceActions;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
@@ -50,7 +50,7 @@ class UserController extends Controller
             ->description('详情')
             ->breadcrumb(
                 ['text' => '用户管理', 'url' => '/users'],
-                ['text' => '用户列表', 'url' => '/users'],
+                ['text' => $id],
                 ['text' => '详情']
             )
             ->body($this->detail($id));
@@ -86,7 +86,7 @@ class UserController extends Controller
             ->description('详情')
             ->breadcrumb(
                 ['text' => '积分记录', 'url' => '/users/point_record'],
-                ['text' => '积分列表', 'url' => '/users/point_record'],
+                ['text' => $id],
                 ['text' => '详情']
             )
             ->body($this->pointRecordDetail($id));
@@ -103,14 +103,18 @@ class UserController extends Controller
         $grid->exporter(new UserExporter());
 
         $grid->u_id('ID');
-        $grid->district()->a_district('区域')->expand(function ($model) {
-            $info = $model->district()->get()->map(function ($item) {
-                return $item->only(['a_manager', 'a_manager_phone']);
+        if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $grid->district()->a_district('区域')->expand(function ($model) {
+                $info = $model->district()->get()->map(function ($item) {
+                    return $item->only(['a_manager', 'a_manager_phone']);
+                });
+                return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
-            return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
-        });
+        }
+        $grid->u_city('城市');
         $grid->u_openid('openId');
         $grid->u_nick('用户昵称');
+        $grid->u_headimg('用户头像')->image('', 64, 64);
         $grid->u_phone('用户手机号');
         $grid->u_current_point('当前积分');
         $grid->u_total_point('总积分');
@@ -151,23 +155,24 @@ class UserController extends Controller
     {
         $show = new Show(User::findOrFail($id));
 
-        $show->district('区域', function ($district) {
-            $district->panel()->tools(function ($tools) {
-                $tools->disableEdit();
-                $tools->disableDelete();
-                $tools->disableList();
+        if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $show->district('区域', function ($district) {
+                $district->a_district('区域');
+                $district->a_manager('区域负责人姓名');
+                $district->a_manager_phone('区域负责人电话');
             });
-            $district->a_district('区域');
-            $district->a_manager('区域负责人姓名');
-            $district->a_manager_phone('区域负责人电话');
-        });
+        }
+
+        $show->u_city('城市');
         $show->u_openid('openId');
         $show->u_nick('用户昵称');
+        $show->u_headimg('用户头像')->image();
         $show->u_phone('用户手机号');
         $show->u_current_point('当前积分');
         $show->u_total_point('总积分');
         $show->u_ip('登录IP');
         $show->u_created('登录时间');
+        $show->u_updated('更新时间');
 
         $show->panel()->tools(function ($tools) {
                 $tools->disableEdit();
@@ -177,19 +182,27 @@ class UserController extends Controller
         return $show;
     }
 
+    /**
+     * 用户积分记录
+     * @return Grid
+     */
     protected function pointRecordGrid()
     {
         $grid = new Grid(new PointRecord());
         $grid->exporter(new PointRecordExporter());
 
         $grid->pr_id('ID');
-        $grid->user()->u_openid('openID');
+        $grid->user()->u_city('城市');
+//        $grid->user()->u_openid('openID');
         $grid->user()->u_nick('用户昵称');
+        $grid->user()->u_headimg('用户头像')->image('', 64, 64);
         $grid->user()->u_phone('用户手机号');
         $grid->pr_prize_type('礼品类型');
         $grid->pr_prize_name('礼品名称');
-        $grid->pr_created('获取/消耗时间');
-        $grid->pr_point('获得/消耗积分');
+        $grid->pr_point('积分')->display(function ($point) {
+            return ($point > 0) ? "<span class='label label-info'>获得 $point</span>" : "<span class='label label-danger'>消耗 $point</span>";
+        });
+        $grid->pr_created('时间');
         $grid->pr_current_point('当前用户积分');
         $grid->shop()->s_name('使用门店')->expand(function ($model) {
             $info = $model->shop()->get()->map(function ($item) {
@@ -245,25 +258,32 @@ class UserController extends Controller
     {
         $show = new Show(PointRecord::findOrFail($id));
 
-        $show->user('用户', function ($user) {
-            $user->district()->a_district('区域')->as(function ($content) {
-                $content = json_decode($content, true);
-                return $content['a_district'];
+        if (!Admin::user()->inRoles(['administrator', '后台管理员'])) {
+            $show->user('用户', function ($user) {
+                $user->district()->a_district('区域')->as(function ($content) {
+                    $content = json_decode($content, true);
+                    return $content['a_district'];
+                });
+                $user->u_openid('openId');
+                $user->u_nick('用户昵称');
+                $user->u_phone('用户手机号');
             });
-            $user->u_openid('openId');
-            $user->u_nick('用户昵称');
-            $user->u_phone('用户手机号');
-        });
+        }
         $show->shop('门店', function ($shop) {
             $shop->s_name('使用门店');
             $shop->s_number('门店序号');
             $shop->s_manager('门店负责人姓名');
             $shop->s_manager_phone('门店负责人电话');
         });
+        $show->user()->u_city('城市')->as(function ($user) {
+            return $user->u_city;
+        });
         $show->pr_prize_type('礼品类型');
         $show->pr_prize_name('礼品名称');
-        $show->pr_created('获取/消耗时间');
-        $show->pr_point('获得/消耗积分');
+        $show->pr_created('时间');
+        $show->pr_point('积分')->as(function ($point) {
+            return ($point > 0) ? "获得 $point" : "消耗 $point";
+        });
         $show->pr_current_point('当前用户积分');
         $show->panel()->tools(function ($tools) {
             $tools->disableList(false);

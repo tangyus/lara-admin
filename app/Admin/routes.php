@@ -34,6 +34,6 @@ Route::group([
     $router->get('users/point_record/{id}', 'UserController@pointRecordShow');
     $router->resource('users', UserController::class, ['only' => ['index', 'show']]);
 
-    $router->get('data/act', 'PrizeController@data');
+    $router->get('data/act', 'ActController@index');
     $router->get('data/stats', 'StatsController@data');
 });

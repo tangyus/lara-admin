@@ -24,7 +24,7 @@ class AuthController extends Controller
 		$user = User::where('u_token', $s3rd)->first();
 		if ($user && $user->u_expired > time()) {
 			// access_token 未过期
-            return $this->responseJson($user->u_token);
+            return $this->responseSuccess($user->u_token);
 		}
 
 		$app = Factory::miniProgram(config('miniprogram'));
@@ -52,12 +52,12 @@ class AuthController extends Controller
                     'u_expired'         => $expired,
                     'u_ip'              => $request->ip(),
                 ];
-                User::insert($attribute);
+                User::create($attribute);
             }
 
-            return $this->responseJson($token);
+            return $this->responseSuccess($token);
         } else {
-            return $this->responseJson([], 1000, $response['errmsg']);
+            return $this->responseFail($response['errmsg']);
         }
 	}
 
@@ -91,12 +91,12 @@ class AuthController extends Controller
                     'u_phone'   => $phone
                 ]);
 
-                return $this->responseJson($response);
+                return $this->responseSuccess($response);
             } catch (\Exception $e) {
-                return $this->responseJson([], 1000, $e->getMessage());
+                return $this->responseFail($e->getMessage());
             }
         } else {
-            return $this->responseJson([], 1000, 'Permission Not Allowed!');
+            return $this->responseFail('Permission Not Allowed!');
         }
     }
 }

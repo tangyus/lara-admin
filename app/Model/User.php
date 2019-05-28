@@ -13,6 +13,8 @@ class User extends Authenticatable
     const CREATED_AT = 'u_created';
     const UPDATED_AT = 'u_updated';
 
+    protected $guarded = [];
+
     public function district()
     {
         return $this->belongsTo(Account::class, 'u_account_id');

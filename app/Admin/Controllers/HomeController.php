@@ -57,8 +57,8 @@ class HomeController extends Controller
     public function wxCode()
     {
         $config = [
-            'app_id' => 'wxfe49d510a7e7853b', // wx82de84528e164c9b wxfe49d510a7e7853b
-            'secret' => '2aadf5a404e444e45408adafee76f2a0', // 74f2e0be5ec582ba0b858c8c6bb7fd47 2aadf5a404e444e45408adafee76f2a0
+            'app_id' => 'wx82de84528e164c9b', // wx82de84528e164c9b wxfe49d510a7e7853b
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47', // 74f2e0be5ec582ba0b858c8c6bb7fd47 2aadf5a404e444e45408adafee76f2a0
 
             // 下面为可选项
             // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
@@ -71,11 +71,11 @@ class HomeController extends Controller
         ];
 
         $app = Factory::miniProgram($config);
-//        $response = $app->app_code->getUnlimit('SDBJJFYL_', [
-//            'page'  => 'pages/index/index',
-//            'width' => 430,
-//        ]);
-//        $response->saveAs(public_path() . '/upload', 'demo.png');
+        $response = $app->app_code->getUnlimit('SDBJJFYL_SXSWDSA', [
+            'page'  => 'Pages/Index/Index',
+            'width' => 430,
+        ]);
+        $response->saveAs(public_path() . '/upload', 'demo.png');
 
 
         $codes = Code::whereNull('c_path')->limit(10)->get();

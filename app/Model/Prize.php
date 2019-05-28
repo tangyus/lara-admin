@@ -12,9 +12,10 @@ class Prize extends Model
     protected $primaryKey = 'p_id';
 
     public $prizeType = [
+        '闪电新人礼' => '闪电新人礼',
         '闪电进阶礼' => '闪电进阶礼',
         '闪电传奇礼' => '闪电传奇礼',
-        '闪电积分礼' => '闪电积分礼',
+        '闪电兑换礼' => '闪电兑换礼',
         '闪电会员礼' => '闪电会员礼'
     ];
 
