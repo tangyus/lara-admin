@@ -13,6 +13,7 @@ use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
+use Encore\Admin\Widgets\Table;
 
 class ShopController extends Controller
 {
@@ -129,12 +130,13 @@ class ShopController extends Controller
         $grid->exporter(new ShopExporter());
 
         $grid->s_id('ID');
-        $grid->s_number('门店序号');
         if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
-            $grid->district()->a_district('区域');
-            $grid->district()->a_city('城市');
-            $grid->district()->a_manager('区域负责人姓名');
-            $grid->district()->a_manager_phone('区域联系电话');
+            $grid->district()->a_district('区域')->expand(function ($model) {
+                $info = $model->district()->get()->map(function ($item) {
+                    return $item->only(['a_district', 'a_city', 'a_manager', 'a_manager_phone']);
+                });
+                return new Table(['区域', '城市', '区域负责人姓名', '区域负责人电话'], $info->toArray());
+            });
 
             // 数据查询过滤
             $grid->filter(function ($filter) {
@@ -148,7 +150,6 @@ class ShopController extends Controller
                             $query->where('a_city', $this->input);
                         });
                     }, '城市');
-
                     $filter->where(function ($query) {
                         $query->whereHas('district', function ($query) {
                             $query->where('a_manager_phone', $this->input);
@@ -158,13 +159,15 @@ class ShopController extends Controller
                 $filter->column(1 / 2, function ($filter) {
                     $filter->equal('s_number', '门店序号');
                     $filter->like('s_name', '门店名称');
-                    $filter->equal('s_manager_phone', '门店联系电话');
+                    $filter->equal('s_manager_phone', '门店负责人电话');
                 });
             });
         } else {
             $grid->disableFilter();
         }
+        $grid->s_number('门店序号');
         $grid->s_name('门店名称');
+        $grid->s_city('门店所在城市');
         $grid->s_manager('门店负责人姓名');
         $grid->s_manager_phone('门店负责人电话');
         $grid->s_password('门店核销密码');
@@ -210,6 +213,7 @@ class ShopController extends Controller
 
         $show->s_name('门店名称');
         $show->s_number('门店序号');
+        $show->s_city('所在城市');
         $show->s_manager('门店负责人姓名');
         $show->s_manager_phone('门店负责人电话');
         $show->s_password('门店核销密码');

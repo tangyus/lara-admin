@@ -12,4 +12,14 @@ class UserPrize extends Model
     protected $primaryKey = 'up_id';
 
     protected $guarded = [];
+
+    public function prize()
+    {
+        return $this->belongsTo(Prize::class, 'up_prize_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'up_uid');
+    }
 }

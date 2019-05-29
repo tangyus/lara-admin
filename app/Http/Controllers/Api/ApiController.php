@@ -76,13 +76,13 @@ class ApiController extends Controller
                 // 是否第一次扫码
                 $isFirst = PointRecord::where(['pr_uid' => Auth::id(), 'pr_prize_type' => '闪电新人礼'])->first();
                 if (!$isFirst) {
-                    // 闪电进阶礼
+                    // 闪电新人礼
                     $attributes[] = $pointRecord->setAttributes('闪电新人礼', $qPoint.'积分奖励', 0, $qPoint, 0);
                 }
                 $attributes[] = $pointRecord->setAttributes('闪电会员礼', $qPoint.'积分奖励', 1, $qPoint, $user->u_current_point + $qPoint);
                 // 判断是否为会员日
                 if ($isDayOfWeek) {
-                    $attributes[] = $pointRecord->setAttributes('闪电会员礼', '双倍'.$qPoint.'积分奖励', 1, $qPoint, $user->u_current_point + $qPoint * 2);
+                    $attributes[] = $pointRecord->setAttributes('闪电会员礼', '会员日额外'.$qPoint.'积分奖励', 1, $qPoint, $user->u_current_point + $qPoint * 2);
                 }
                 // 增加积分记录
                 PointRecord::insert($attributes);
@@ -92,6 +92,28 @@ class ApiController extends Controller
                 $codeInfo->save();
 
                 DB::commit();
+
+                // 判断是否有进阶礼资格
+                $firstDay = strtotime('today') + 86400;
+                $lastDay = $firstDay - 86400 * 14;
+                $lastDate = date('Y-m-d H:i:s', $lastDay);
+                $firstDate = date('Y-m-d H:i:s', $firstDay);
+                $dateArr = [];
+                PointRecord::where(['pr_prize_type' => '闪电会员礼', 'pr_uid' => $user->u_id])
+                    ->whereRaw("pr_created > '$lastDate' and pr_created < '$firstDate'")
+                    ->orderBy('pr_created', 'asc')
+                    ->get()
+                    ->map(function ($item) use (&$dateArr) {
+                        $dateKey = date('Y-m-d', strtotime($item->pr_created));
+                        if (!in_array($dateKey, $dateArr)) {
+                            $dateArr[] = $dateKey;
+                        }
+                    });
+                if (count($dateArr) >= 7) {
+                    // 任意2周时间段内扫码7天，获得进阶礼
+                    PointRecord::insert($pointRecord->setAttributes('闪电进阶礼', '35积分奖励', 1, 35, $user->u_current_point + 35));
+                }
+
                 return $this->responseSuccess([
                     'double'    => $isDayOfWeek ? 1 : 0,
                     'point'     => $point,
@@ -125,7 +147,11 @@ class ApiController extends Controller
 		// 活动规则
 
 
-        $pointRecord = PointRecord::where(['pr_prize_type' => '闪电新人礼', 'pr_received' => 0])->first();
+        // 新人奖
+        $newPrize = PointRecord::where(['pr_prize_type' => '闪电新人礼', 'pr_received' => 0, 'pr_uid' => $user->u_id])->first();
+
+		// 进阶奖
+        $advancePrize = PointRecord::where(['pr_prize_type' => '闪电进阶礼', 'pr_received' => 0, 'pr_uid' => $user->u_id])->first();
 
 		return $this->responseSuccess([
 			'user' 	=> [
@@ -133,8 +159,8 @@ class ApiController extends Controller
 				'phone' 		=> $user->u_phone,
 				'currentPoint' 	=> $user->u_current_point,
 				'currentCity'  	=> $user->u_city,
-                'newPrize'      => $pointRecord ? 1 : 0,
-                'advancePrize'  => 0,
+                'newPrize'      => $newPrize ? 1 : 0,
+                'advancePrize'  => $advancePrize ? 1 : 0,
 			],
 			'cities' => $cities
 		]);
@@ -205,8 +231,10 @@ class ApiController extends Controller
 
                 // 增加奖品领取量
                 Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => $pointType])->increment('p_receive_number');
+                DB::commit();
                 return $this->responseSuccess($pointRecord->pr_point);
             } catch (\Exception $e) {
+                DB::rollback();
                 return $this->responseFail($e->getMessage());
             }
         } else {
@@ -296,7 +324,7 @@ class ApiController extends Controller
                     'up_uid'        => $user->u_id,
                     'up_type'       => '抽奖',
                     'up_prize_id'   => $prizeList[$result]->p_id,
-                    'up_coupon_code'=> isset($couponCode) ? $couponCode->cc_code : null
+                    'up_code'       => isset($couponCode) ? $couponCode->cc_code : strtoupper(substr(md5(time().mt_rand(1000, 9999)), 0, 20))
                 ]);
                 // 修改优惠券码为已使用
                 if (isset($couponCode)) {
@@ -329,7 +357,7 @@ class ApiController extends Controller
 
         $userPrize = UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
-            ->select(DB::raw('p_name as name, p_thumb as thumb, p_img as img, up_received as received, up_coupon_code as couponCode, up_id as id'))
+            ->select(DB::raw('p_name as name, p_thumb as thumb, p_img as img, up_received as received, up_code as code, up_id as id'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)

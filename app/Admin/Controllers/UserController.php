@@ -106,9 +106,9 @@ class UserController extends Controller
         if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
             $grid->district()->a_district('区域')->expand(function ($model) {
                 $info = $model->district()->get()->map(function ($item) {
-                    return $item->only(['a_manager', 'a_manager_phone']);
+                    return $item->only(['a_district', 'a_city', 'a_manager', 'a_manager_phone']);
                 });
-                return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
+                return new Table(['区域', '城市', '区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
         }
         $grid->u_city('城市');

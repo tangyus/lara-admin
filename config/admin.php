@@ -11,7 +11,7 @@ return [
     | login page.
     |
     */
-    'name' => '佳得乐',
+    'name' => '佳得乐管理后台',
 
     /*
     |--------------------------------------------------------------------------
@@ -22,7 +22,7 @@ return [
     | `img` tag, eg '<img src="http://logo-url" alt="Admin logo">'.
     |
     */
-    'logo' => '<b>佳得乐</b>',
+    'logo' => '<b>佳得乐管理后台</b>',
 
     /*
     |--------------------------------------------------------------------------
@@ -251,7 +251,7 @@ return [
     | This value is used to set the background image of login page.
     |
     */
-    'login_background_image' => '',
+    'login_background_image' => '/imgs/bg.png',
 
     /*
     |--------------------------------------------------------------------------
@@ -290,7 +290,7 @@ return [
     |
     | Whether enable default breadcrumb for every page content.
     */
-    'enable_default_breadcrumb' => true,
+    'enable_default_breadcrumb' => false,
 
     /*
     |--------------------------------------------------------------------------

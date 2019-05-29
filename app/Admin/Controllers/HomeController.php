@@ -14,26 +14,6 @@ use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
-    public function index(Content $content)
-    {
-        return $content
-            ->row(Dashboard::title())
-            ->row(function (Row $row) {
-
-                $row->column(4, function (Column $column) {
-                    $column->append(Dashboard::environment());
-                });
-
-                $row->column(4, function (Column $column) {
-                    $column->append(Dashboard::extensions());
-                });
-
-                $row->column(4, function (Column $column) {
-                    $column->append(Dashboard::dependencies());
-                });
-            });
-    }
-
     public function createCodes()
     {
         try {
@@ -54,38 +34,22 @@ class HomeController extends Controller
         }
     }
 
+    /**
+     * 生成小程序码
+     * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
+     * @throws \EasyWeChat\Kernel\Exceptions\RuntimeException
+     */
     public function wxCode()
     {
-        $config = [
-            'app_id' => 'wx82de84528e164c9b', // wx82de84528e164c9b wxfe49d510a7e7853b
-            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47', // 74f2e0be5ec582ba0b858c8c6bb7fd47 2aadf5a404e444e45408adafee76f2a0
-
-            // 下面为可选项
-            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
-            'response_type' => 'array',
-
-            'log' => [
-                'level' => 'debug',
-                'file' => public_path().'/wechat.log',
-            ],
-        ];
-
-        $app = Factory::miniProgram($config);
-        $response = $app->app_code->getUnlimit('SDBJJFYL_SXSWDSA', [
-            'page'  => 'Pages/Index/Index',
-            'width' => 430,
-        ]);
-        $response->saveAs(public_path() . '/upload', 'demo.png');
-
-
+        $app = Factory::miniProgram(config('miniprogram'));
         $codes = Code::whereNull('c_path')->limit(10)->get();
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
-                'page'  => 'pages/index/index',
+                'page'  => 'Pages/Index/Index',
                 'width' => 430,
             ]);
             if ($response instanceof StreamResponse) {
-                $filename = $code->c_code . '_' . $code->c_id . '.png';
+                $filename = $code->c_code.'_'.$code->c_id.'.jpg';
                 $response->saveAs(public_path() . '/codes', $filename);
 
                 $code->c_path = '/codes/' . $filename;

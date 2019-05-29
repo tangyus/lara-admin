@@ -136,7 +136,7 @@ class AccountController
      */
     public function accountsList()
     {
-        $accounts = Account::get(['a_id as id', 'a_district as text']);
+        $accounts = DB::select('select `a_id` as `id`, `a_district` as `text` from `g_4357_accounts` group by `text` ORDER BY `id`');
 
         return $accounts ? $accounts : $this->districts;
     }
@@ -171,9 +171,10 @@ class AccountController
         $show->a_manager_phone('区域联系电话');
         $show->a_account('账号');
         $show->a_password('密码');
+        $show->a_scan_times('单日扫码次数');
         $show->a_state('是否停用')->using([1 => '是', 0 => '否']);
         $show->a_created('创建时间');
-        $show->a_updated('修改时间');
+        $show->a_updated('更新时间');
 
         $show->panel()->tools(function ($tools) {
             $tools->disableEdit(false);
@@ -200,9 +201,10 @@ class AccountController
         $grid->a_manager_phone('区域联系电话');
         $grid->a_account('账号');
         $grid->a_password('密码');
+        $grid->a_scan_times('单日扫码次数');
         $grid->a_state('是否停用')->switch($this->states);
         $grid->a_created('创建时间');
-        $grid->a_updated('修改时间');
+        $grid->a_updated('更新时间');
 
         $grid->disableRowSelector();
         $grid->actions(function ($actions) {
@@ -214,7 +216,7 @@ class AccountController
             $filter->disableIdFilter();
 
             $filter->column(1 / 2, function ($filter) {
-                $filter->equal('a_district', '区域')->select('/admin/accounts_list');
+                $filter->equal('a_id', '区域')->select('/admin/accounts_list');
             });
             $filter->column(1 / 2, function ($filter) {
                 $filter->equal('a_manager', '区域负责人姓名');
@@ -234,24 +236,25 @@ class AccountController
         $form = new Form(new Account());
 
         if (!$id) {
-            $form->select('a_district', '区域')->options($this->districts)->rules('required', ['required' => '请选择区域']);
+            $form->text('a_district', '区域')->rules('required', ['required' => '请选择区域']);
             $form->text('a_city', '城市')->rules('required', ['required' => '请输入城市']);
             $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
-
             // 添加后台登录账号和角色
             $form->saved(function (Form $form) {
-                $userId = DB::table('admin_users')->insertGetId([
-                    'username'      => $form->input('a_account'),
-                    'password'      => bcrypt($form->input('a_password')),
-                    'name'          => $form->input('a_district') . '区域市场人员',
-                    'created_at'    => Carbon::now(),
-                    'updated_at'    => Carbon::now(),
-                ]);
+                if (!empty($form->input('a_account'))) {
+                    $userId = DB::table('admin_users')->insertGetId([
+                        'username'      => $form->input('a_account'),
+                        'password'      => bcrypt($form->input('a_password')),
+                        'name'          => $form->input('a_district').$form->input('a_city').'市场人员',
+                        'created_at'    => Carbon::now(),
+                        'updated_at'    => Carbon::now(),
+                    ]);
 
-                DB::table('admin_role_users')->insert([
-                    'role_id' => 3,
-                    'user_id' => $userId
-                ]);
+                    DB::table('admin_role_users')->insert([
+                        'role_id' => 3,
+                        'user_id' => $userId
+                    ]);
+                }
             });
         }
         $form->text('a_manager', '区域负责人姓名')->rules('required', ['required' => '请输入区域负责人姓名']);
@@ -260,7 +263,9 @@ class AccountController
             'regex'     => '电话号码非法'
         ]);
         $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
+        $form->number('a_scan_times', '单日扫码次数')->default(0)->min(0);
         $form->switch('a_state', '是否停用')->states($this->states);
+
         $form->tools(function ($tools) {
             $tools->disableDelete();
         });

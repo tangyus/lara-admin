@@ -9,6 +9,10 @@ Route::group([
     'namespace'     => config('admin.route.namespace'),
     'middleware'    => config('admin.route.middleware'),
 ], function (Router $router) {
+    $router->get('/', function () {
+        return redirect('/admin/users');
+    });
+
     $router->get('create_codes', 'HomeController@createCodes');
     $router->get('wx_codes', 'HomeController@wxCode');
 

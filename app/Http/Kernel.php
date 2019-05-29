@@ -19,7 +19,8 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \App\Http\Middleware\TrustProxies::class,
-//		\App\Http\Middleware\MiniProgramAuth::class
+//		\App\Http\Middleware\MiniProgramAuth::class,
+		\App\Http\Middleware\WebAuth::class
     ];
 
     /**
@@ -59,5 +60,6 @@ class Kernel extends HttpKernel
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'miniprogram.auth' => \App\Http\Middleware\MiniProgramAuth::class,
+        'web.auth' => \App\Http\Middleware\WebAuth::class
     ];
 }

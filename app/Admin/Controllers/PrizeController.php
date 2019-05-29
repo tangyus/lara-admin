@@ -14,6 +14,7 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
+use Illuminate\Support\Facades\Auth;
 
 class PrizeController extends Controller
 {
@@ -126,9 +127,9 @@ class PrizeController extends Controller
         if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
             $grid->district()->a_district('区域')->expand(function ($model) {
                 $info = $model->district()->get()->map(function ($item) {
-                    return $item->only(['a_manager', 'a_manager_phone']);
+                    return $item->only(['a_district', 'a_city', 'a_manager', 'a_manager_phone']);
                 });
-                return new Table(['区域负责人姓名', '区域负责人电话'], $info->toArray());
+                return new Table(['区域', '城市', '区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
             $grid->filter(function ($filter) {
                 $filter->disableIdFilter();
@@ -162,8 +163,8 @@ class PrizeController extends Controller
         } else {
             $grid->p_state('是否停用')->switch($this->states);
         }
-        $grid->p_img('礼品图')->image('', 100, 100);
-        $grid->p_thumb('礼品缩略图')->image('', 100, 100);
+//        $grid->p_img('礼品图')->image('', 100, 100);
+//        $grid->p_thumb('礼品缩略图')->image('', 100, 100);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
 
@@ -212,8 +213,10 @@ class PrizeController extends Controller
         $show->p_updated('修改时间');
 
 		$show->panel()->tools(function ($tools) {
-			$tools->disableEdit(false);
 			$tools->disableList(false);
+			if (Admin::user()->isRole('市场人员')) {
+                $tools->disableEdit(false);
+            }
 		});
 
         return $show;

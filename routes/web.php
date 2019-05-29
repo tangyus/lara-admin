@@ -37,3 +37,17 @@ Route::group([
         $router->post('user_exchange_prize', 'ApiController@userExchangePrizeList');
 	});
 });
+
+Route::group([
+    'prefix'    => 'web',
+    'namespace' => 'Web',
+    'middleware' => ['web']
+], function (\Illuminate\Routing\Router $router) {
+    $router->post('auth', 'IndexController@auth');
+    $router->post('login', 'IndexController@login');
+    $router->get('jssdk', 'IndexController@jssdk');
+
+    $router->post('prize_info', 'IndexController@prizeInfo');
+    $router->post('verify_prize', 'IndexController@verifyPrize');
+    $router->post('verify_record', 'IndexController@verifyRecord');
+});

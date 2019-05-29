@@ -99,14 +99,18 @@ class QrcodeController extends Controller
             $grid->disableCreateButton();
         }
 
-        $grid->actions(function ($actions) {
-            $actions->disableEdit();
-            $actions->disableDelete();
-            $actions->disableView();
+        if (Admin::user()->isRole('市场人员')) {
+            $grid->actions(function ($actions) {
+                $actions->disableEdit();
+                $actions->disableDelete();
+                $actions->disableView();
 
-            $row = $actions->row;
-            $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
-        });
+                $row = $actions->row;
+                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
+            });
+        } else {
+            $grid->disableActions();
+        }
 
         return $grid;
     }
@@ -148,9 +152,13 @@ class QrcodeController extends Controller
         return $form;
     }
 
+    /**
+     * 生成 zip 压缩包文件
+     * @param $model
+     */
     protected function zipCodes($model)
     {
-        $codes = Code::whereNull('c_qrcode_id')->limit($model->q_number)->get();
+        $codes = Code::whereNull('c_qrcode_id')->orderBy('c_id', 'asc')->limit($model->q_number)->get();
         if (count($codes) > 0) {
             $publicPath = public_path();
             $path = $publicPath . '/download/codes';
@@ -167,7 +175,6 @@ class QrcodeController extends Controller
                     }
                 }
                 $zip->close(); // 关闭处理的zip文件
-
                 Code::whereIn('c_id', $ids)->limit($model->q_number)->update(['c_qrcode_id' => $model->q_id]);
 
                 $model->q_zip_path = "/download/codes/{$model->q_id}.zip";
