@@ -158,9 +158,11 @@ class IndexController extends Controller
 
     public function jssdk()
     {
+        // TY wx1c46b3106e3c6bc5 11c7d0796822535df1a4d7eabb3c6fdc
+        // 百事 wx97ba3ea86432e115 d268f390922bffd60c98bc93705ed6c7
         $config = [
-            'app_id' => 'wx97ba3ea86432e115',
-            'secret' => 'd268f390922bffd60c98bc93705ed6c7',
+            'app_id' => 'wx1c46b3106e3c6bc5',
+            'secret' => '11c7d0796822535df1a4d7eabb3c6fdc',
 
             // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
             'response_type' => 'array',
@@ -168,7 +170,8 @@ class IndexController extends Controller
             //...
         ];
         $app = Factory::officialAccount($config);
-        $jssdkApi = ['scanQRCode'];
+        $jssdkApi = ['checkJsApi', 'scanQRCode'];
+        $app->jssdk->setUrl('https://jifenyouli.pamierde.com/web/index.html');
         $response = $app->jssdk->buildConfig($jssdkApi, false, false, true);
         return $response;
     }

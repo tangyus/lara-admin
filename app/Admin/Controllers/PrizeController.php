@@ -177,7 +177,7 @@ class PrizeController extends Controller
         }
         $grid->actions(function ($actions) {
             $actions->disableDelete();
-            if (Admin::user()->cannot('prizes.create')) {
+            if (!Admin::user()->isRole('市场人员')) {
                 $actions->disableEdit();
             }
         });
@@ -207,7 +207,7 @@ class PrizeController extends Controller
         $show->p_rate('中奖概率')->as(function ($rate) {
             return is_null($rate) ? '-' : $rate . '%';
         });
-        $show->p_img('礼品图')->image();
+//        $show->p_img('礼品图')->image();
         $show->p_thumb('礼品缩略图')->image();
         $show->p_created('创建时间');
         $show->p_updated('修改时间');
@@ -250,16 +250,42 @@ class PrizeController extends Controller
         $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
         $form->radio('p_type', '礼品类型')->options((new Prize())->prizeType)->rules('required', ['required' => '请选择礼品类型']);
         $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
-        $form->textarea('p_detail', '礼品详情')->rules('required', ['required' => '请输入礼品详情']);
-        $form->number('p_point', '兑换所需积分')->min(0)->default(0);
-        $form->rate('p_rate', '中奖概率')->setWidth(1, 2);
+        $form->text('p_point', '兑换所需积分')->default(0)->disable();
+        $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->disable();
+        $form->text('p_apply_city', '适用城市');
+        $form->text('p_apply_shop', '适用门店');
+        $form->text('p_rule', '领取规则');
+        $form->datetime('p_deadline', '领取截止时间');
+        $form->text('p_phone_number', '活动热线');
+
+//        $form->image('p_img', '礼品图')->move('prizes')->rules('required', ['required' => '请上传礼品图']);
+        $form->image('p_thumb', '礼品缩略图')->move('prizes')->rules('required', ['required' => '请上传礼品缩略图']);
         $form->switch('p_state', '是否停用')->states($this->states);
-        $form->image('p_img', '礼品图')->move('prizes');
-        $form->image('p_thumb', '礼品缩略图')->move('prizes');
 
         $form->tools(function ($tools) {
             $tools->disableDelete();
         });
+
+        $form->html("
+            <script type='text/javascript'>
+                    $(function() {
+                        $('.radio-inline').click(function() {
+                            var a= $('.iradio_minimal-blue.hover')[0];
+                            var val = $($(a).children()[0]).val();
+                            if (val == '闪电传奇礼') {
+                                $('#p_rate').attr('disabled', false);
+                                $('#p_point').attr('disabled', true);
+                            } else if (val == '闪电兑换礼') {
+                                $('#p_point').attr('disabled', false);
+                                $('#p_rate').attr('disabled', true);
+                            } else {
+                                 $('#p_point').attr('disabled', true);
+                                $('#p_rate').attr('disabled', true);
+                            }
+                        })
+                    })
+            </script>
+        ");
 
         return $form;
     }

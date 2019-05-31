@@ -38,6 +38,10 @@ Route::group([
     $router->get('users/point_record/{id}', 'UserController@pointRecordShow');
     $router->resource('users', UserController::class, ['only' => ['index', 'show']]);
 
+    // 数据管理
     $router->get('data/act', 'ActController@index');
     $router->get('data/stats', 'StatsController@data');
+
+    // 规则管理
+    $router->resource('rules', RuleController::class, ['except' => ['delete']]);
 });
