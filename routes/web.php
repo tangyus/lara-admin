@@ -16,7 +16,7 @@ Route::group([
 	'namespace' => 'Api',
 	'middleware' => ['api']
 ], function (\Illuminate\Routing\Router $router) {
-	$router->post('auth', 'AuthController@auth');
+	$router->get('auth', 'AuthController@auth');
 	$router->post('user_info', 'AuthController@decryptUserInfo');
 
 	$router->group(['middleware' => 'miniprogram.auth'], function ($router) {

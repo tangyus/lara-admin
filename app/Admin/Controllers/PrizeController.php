@@ -153,7 +153,19 @@ class PrizeController extends Controller
         $grid->p_rate('中奖概率')->display(function () {
 			return is_null($this->p_rate) ? '-' : $this->p_rate . '%';
 		});
+        $grid->p_detail('礼品详情')->expand(function ($model) {
+			return new Table(['适用城市', '适用门店', '领取规则', '领取截止时间', '活动热线'], [0 => [
+				$model->p_apply_city,
+				$model->p_apply_shop,
+				$model->p_rule,
+				$model->p_deadline,
+				$model->p_phone_number,
+			]]);
+		});
         $grid->p_number('礼品数量');
+        $grid->p_current_number('剩余数量')->display(function () {
+        	return $this->p_number - $this->p_received_number;
+		});
         if (Admin::user()->cannot('prizes.create')) {
             $grid->p_state('是否停用')->using(['否', '是']);
             $grid->disableCreateButton();

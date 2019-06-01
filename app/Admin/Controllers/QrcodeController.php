@@ -90,7 +90,7 @@ class QrcodeController extends Controller
         $grid->q_number('生成数量');
         $grid->q_point('扫码积分');
         $grid->q_member_date('会员日')->using($this->memberDate);
-        $grid->q_expired('二维码有效期');
+        $grid->q_expired('二维码扫描截止日期');
         $grid->q_created('生成时间');
 
         $grid->disableRowSelector();
@@ -138,8 +138,8 @@ class QrcodeController extends Controller
 
         $form->text('q_city', '城市')->rules('required', ['required' => '请输入城市']);
         $form->text('q_number', '生成数量')->rules('required', ['required' => '请输入生成数量']);
-        $form->datetime('q_expired', '二维码有效期')->rules('required', ['required' => '请选择二维码有效期']);
-        $form->radio('q_member_date', '会员日')->options($this->memberDate)->rules('required', ['required' => '请选择会员日']);
+        $form->datetime('q_expired', '二维码扫描截止日期')->setWidth(6, 2)->rules('required', ['required' => '请选择二维码扫描截止日期']);
+        $form->radio('q_member_date', '会员日')->options($this->memberDate);
         $form->number('q_point', '扫码积分')->min(5)->default(5);
 
         $form->ignore('q_district');

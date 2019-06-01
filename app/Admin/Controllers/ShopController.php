@@ -272,7 +272,7 @@ class ShopController extends Controller
             'regex'     => '电话号码非法'
         ]);
         $form->text('s_address', '门店地址')->rules('required', ['required' => '请输入门店地址']);
-        $form->password('s_password', '门店核销密码')->rules('required', ['required' => '请输入门店核销密码']);
+        $form->password('s_password', '门店核销密码')->placeholder('市场人员与门店负责人确认，建议设置为门店负责人手机号')->rules('required', ['required' => '请输入门店核销密码']);
         $form->switch('s_state', '是否停用')->states($this->states);
 
         $form->tools(function (Form\Tools $tools) {

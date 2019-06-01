@@ -2,7 +2,9 @@
 
 namespace App\Admin\Extensions;
 
+use App\model\Account;
 use App\Model\User;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid\Exporters\ExcelExporter;
 use Maatwebsite\Excel\Concerns\Exportable;
 
@@ -25,6 +27,15 @@ class UserExporter extends ExcelExporter
 
     public function query()
     {
-        return User::query()->leftJoin('accounts', 'u_account_id', 'a_id')->select(array_keys($this->columns));
+        return User::query()
+			->leftJoin('accounts', 'u_account_id', 'a_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('u_account_id', $account->a_id);
+				}
+			})
+			->select(array_keys($this->columns));
     }
 }

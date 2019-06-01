@@ -22,7 +22,6 @@ class PrizeExporter extends ExcelExporter implements WithStrictNullComparison
         'p_rate'            => '中奖概率(%)',
         'p_number'          => '礼品数量',
         'p_state'           => '是否停用(0/否、1/是)',
-        'p_detail'          => '礼品详情',
         'p_created'         => '创建时间',
         'p_updated'         => '修改时间',
     ];

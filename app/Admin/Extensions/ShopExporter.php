@@ -2,6 +2,7 @@
 
 namespace App\Admin\Extensions;
 
+use App\model\Account;
 use App\model\Shop;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid;
@@ -41,6 +42,14 @@ class ShopExporter extends ExcelExporter implements WithStrictNullComparison
 
     public function query()
     {
-        return Shop::query()->leftJoin('accounts', 's_account_id', 'a_id')->select(array_keys($this->columns));
+        return Shop::query()->leftJoin('accounts', 's_account_id', 'a_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('s_account_id', $account->a_id);
+				}
+			})
+			->select(array_keys($this->columns));
     }
 }

@@ -48,6 +48,7 @@ class ActController extends Controller
             $grid->model()->where('p_account_id', $account->a_id);
         }
         $grid->p_id('ID');
+        $grid->district()->a_district('区域');
         $grid->p_type('礼品类型');
         $grid->p_name('礼品名称');
         $grid->p_number('礼品设置总量');

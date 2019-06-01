@@ -171,7 +171,7 @@ class AccountController
         $show->a_manager_phone('区域联系电话');
         $show->a_account('账号');
         $show->a_password('密码');
-        $show->a_scan_times('单日扫码次数');
+        $show->a_scan_times('每个ID单日扫码最高次数');
         $show->a_state('是否停用')->using([1 => '是', 0 => '否']);
         $show->a_created('创建时间');
         $show->a_updated('更新时间');
@@ -201,7 +201,7 @@ class AccountController
         $grid->a_manager_phone('区域联系电话');
         $grid->a_account('账号');
         $grid->a_password('密码');
-        $grid->a_scan_times('单日扫码次数');
+        $grid->a_scan_times('每个ID单日扫码最高次数');
         $grid->a_state('是否停用')->switch($this->states);
         $grid->a_created('创建时间');
         $grid->a_updated('更新时间');
@@ -263,7 +263,7 @@ class AccountController
             'regex'     => '电话号码非法'
         ]);
         $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
-        $form->number('a_scan_times', '单日扫码次数')->default(0)->min(0);
+        $form->number('a_scan_times', '每个ID单日扫码最高次数')->default(0)->min(0);
         $form->switch('a_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {

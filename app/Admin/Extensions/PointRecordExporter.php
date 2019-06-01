@@ -2,7 +2,9 @@
 
 namespace App\Admin\Extensions;
 
+use App\model\Account;
 use App\Model\PointRecord;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid\Exporters\ExcelExporter;
 use Maatwebsite\Excel\Concerns\Exportable;
 
@@ -25,6 +27,15 @@ class PointRecordExporter extends ExcelExporter
 
     public function query()
     {
-        return PointRecord::query()->leftJoin('users', 'pr_uid', 'u_id')->select(array_keys($this->columns));
+        return PointRecord::query()
+			->leftJoin('users', 'pr_uid', 'u_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('u_account_id', $account->a_id);
+				}
+			})
+			->select(array_keys($this->columns));
     }
 }

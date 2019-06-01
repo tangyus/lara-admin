@@ -127,31 +127,41 @@ class ApiController extends Controller
         $rule = Rule::where('r_account_id', $user->u_account_id)->first();
 
         // 新人奖
-        $newPrize = PointRecord::where(['pr_prize_type' => Prize::MEMBER_PRIZE, 'pr_received' => 0, 'pr_uid' => $user->u_id])->first();
+        $newPrize = PointRecord::where(['pr_prize_type' => Prize::NEW_PRIZE, 'pr_received' => 0, 'pr_uid' => $user->u_id])->first();
 
 		// 进阶奖
-        $advancePrize = 0;
-        // 判断是否有进阶礼资格
-        $firstDay = strtotime('today') + 86400;
-        $lastDay = $firstDay - 86400 * 14;
-        $lastDate = date('Y-m-d H:i:s', $lastDay);
-        $firstDate = date('Y-m-d H:i:s', $firstDay);
-        $dateArr = [];
-        PointRecord::where(['pr_prize_type' => Prize::MEMBER_PRIZE, 'pr_uid' => $user->u_id])
-            ->whereRaw("pr_created > '$lastDate' and pr_created < '$firstDate'")
-            ->orderBy('pr_created', 'asc')
-            ->get()
-            ->map(function ($item) use (&$dateArr) {
-                $dateKey = date('Y-m-d', strtotime($item->pr_created));
-                if (!in_array($dateKey, $dateArr)) {
-                    $dateArr[] = $dateKey;
-                }
-            });
-        if (count($dateArr) >= 7) {
-            // 任意2周时间段内扫码7天，获得进阶礼
-            PointRecord::insert((new PointRecord())->setAttributes(Prize::ADVANCE_PRIZE, '35积分奖励', 1, 35, $user->u_current_point + 35));
-            $advancePrize = 1;
-        }
+		$advancePrizeData = PointRecord::where(['pr_prize_type' => Prize::ADVANCE_PRIZE, 'pr_uid' => $user->u_id])->first();
+		$dateArr = [];
+		if (!$advancePrizeData) {
+			$advancePrize = 0;
+			// 判断是否有进阶礼资格
+			$firstDay = strtotime('today') + 86400;
+			$lastDay = $firstDay - 86400 * 14;
+			$lastDate = date('Y-m-d H:i:s', $lastDay);
+			$firstDate = date('Y-m-d H:i:s', $firstDay);
+			$dateArr = [];
+			PointRecord::where(['pr_prize_type' => Prize::MEMBER_PRIZE, 'pr_uid' => $user->u_id])
+				->whereRaw("pr_created > '$lastDate' and pr_created < '$firstDate'")
+				->orderBy('pr_created', 'asc')
+				->get()
+				->map(function ($item) use (&$dateArr) {
+					$dateKey = date('Y-m-d', strtotime($item->pr_created));
+					if (!in_array($dateKey, $dateArr)) {
+						$dateArr[] = $dateKey;
+					}
+				});
+			if (count($dateArr) >= 7) {
+				// 任意2周时间段内扫码7天，获得进阶礼
+				PointRecord::insert((new PointRecord())->setAttributes(Prize::ADVANCE_PRIZE, '35积分奖励', 0, 35, $user->u_current_point + 35));
+				$advancePrize = 1;
+			}
+		} else {
+			if ($advancePrizeData->pr_received == 0) {
+				$advancePrize = 1;
+			} else {
+				$advancePrize = 2;
+			}
+		}
 
 		return $this->responseSuccess([
 			'user' 	=> [
@@ -160,7 +170,7 @@ class ApiController extends Controller
 				'currentPoint' 	=> $user->u_current_point,
 				'currentCity'  	=> $user->u_city,
                 'newPrize'      => $newPrize ? 1 : 0,
-                'advancePrize'  => $advancePrize ? 1 : 0,
+                'advancePrize'  => $advancePrize,
                 'dateArr'       => $dateArr,
                 'actImg'        => $rule ? $rule->r_act_img : '',
                 'ruleImg'       => $rule ? $rule->r_rule_img : ''
@@ -179,31 +189,30 @@ class ApiController extends Controller
 		$type = $request->input('type', 1);
 		$page = $request->input('page', 1);
 		$pageSize = $request->input('pageSize', 10);
-		$data = PointRecord::where(function ($query) use ($type) {
-                    $query->where('pr_uid', Auth::id());
-                    $query->where('pr_received', 1);
-                    $query->where('pr_point', $type == 1 ? '>' : '<', 0);
-                })
-                ->orderBy('pr_updated', 'asc')
-                ->select(DB::raw('pr_id, pr_point, pr_current_point, pr_created, pr_prize_type, pr_prize_name'))
-                ->offset(($page - 1) * $pageSize)
-                ->limit($pageSize)->get();
 
-		$list = [];
-		if (count($data) > 0) {
-			foreach ($data as $item) {
-                $list[] = [
-                    'id'            => $item['pr_id'],
+		$data = [];
+		PointRecord::where(function ($query) use ($type) {
+				$query->where('pr_uid', Auth::id());
+				$query->where('pr_received', 1);
+				$query->where('pr_point', ($type == 1) ? '>' : '<', 0);
+			})
+			->orderBy('pr_updated', 'asc')
+			->select(DB::raw('pr_id, pr_point, pr_current_point, pr_created, pr_prize_type, pr_prize_name'))
+			->offset(($page - 1) * $pageSize)
+			->limit($pageSize)
+			->get()
+			->map(function ($item) use (&$data) {
+				$list[] = [
+					'id'            => $item['pr_id'],
 					'point' 		=> $item['pr_point'],
 					'currentPoint' 	=> $item['pr_current_point'],
 					'date' 			=> date('Y-m-d', strtotime($item['pr_created'])),
 					'type' 			=> $item['pr_prize_type'],
 					'name'			=> $item['pr_prize_name']
 				];
-			}
-		}
+			});
 
-		return $this->responseSuccess(['currentPoint' => Auth::user()->u_current_point, 'list' => $list]);
+		return $this->responseSuccess(['currentPoint' => Auth::user()->u_current_point, 'list' => $data]);
 	}
 
     /**
@@ -252,29 +261,29 @@ class ApiController extends Controller
     public function lotteryPrizes()
     {
         $user = Auth::user();
-        $prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])->limit(8)->get();
 
-        $data = [];
-        if (count($prizeList) > 0) {
-            foreach ($prizeList as $key => $prize) {
-                $data[$key + 1] = [
-                    'aid'       => $prize->p_id,
-                    'name'      => $prize->p_name,
-//                    'thumb'     => $prize->p_thumb,
-                    'img'       => $prize->p_img,
-                    'isShoe'    => strpos($prize->p_name, '跑鞋') ? 1 : 0,
-                    'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0
-                 ];
-            }
-            $data[-1] = [
-                'aid'       => 0,
-                'name'      => '立即抽奖',
-                'thumb'     => '',
-                'img'       => '',
-                'isShoe'    => 0,
-                'isCoupon'  => 0
-            ];
-        }
+		$data = [];
+        Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])
+			->limit(8)
+			->get()
+			->map(function ($prize, $key) use (&$data) {
+				$data[$key + 1] = [
+					'aid'       => $prize->p_id,
+					'name'      => $prize->p_name,
+					'img'       => $prize->p_img,
+					'isShoe'    => strpos($prize->p_name, '跑鞋') ? 1 : 0,
+					'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0
+				];
+			});
+
+		$data[-1] = [
+			'aid'       => 0,
+			'name'      => '立即抽奖',
+			'thumb'     => '',
+			'img'       => '',
+			'isShoe'    => 0,
+			'isCoupon'  => 0
+		];
 
         return $this->responseSuccess($data);
 	}
@@ -296,72 +305,75 @@ class ApiController extends Controller
             'needSaveInfo' => '',
             'isCoupon' => '',
         ];
-        DB::beginTransaction();
-        try {
-            $user->u_current_point = $user->u_current_point - 5;
-            $user->save();
+        if ($user->u_current_point < 5) {
+			return $this->responseSuccess(['pointIsNotEnough' => 1, 'data' => $data]);
+		}
+		DB::beginTransaction();
+		try {
+			$user->u_current_point = $user->u_current_point - 5;
+			$user->save();
 
-            $prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])->get();
-            $randArr = [];
-            foreach ($prizeList as $item) {
-                $randArr[] = (int) ($item->p_rate * 100);
-            }
+			$prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])->get();
+			$randArr = [];
+			foreach ($prizeList as $item) {
+				$randArr[] = (int) ($item->p_rate * 100);
+			}
 
-            //概率数组的总概率精度
-            $proSum = array_sum($randArr);
-            //概率数组循环
-            foreach ($randArr as $key => $value) {
-                $rand = mt_rand(1, $proSum);
-                if ($rand <= $value) {
-                    $result = $key;
-                    break;
-                } else {
-                    $proSum -= $value;
-                }
-            }
+			//概率数组的总概率精度
+			$proSum = array_sum($randArr);
+			//概率数组循环
+			foreach ($randArr as $key => $value) {
+				$rand = mt_rand(1, $proSum);
+				if ($rand <= $value) {
+					$result = $key;
+					break;
+				} else {
+					$proSum -= $value;
+				}
+			}
 
-            // 扣去用户积分
-            $pointRecord = new PointRecord();
-            $pointRecordAttribute = $pointRecord->setAttributes(Prize::LEGEND_PRIZE, '50积分抽奖', 1, -5, $user->u_current_point);
-            PointRecord::insert($pointRecordAttribute);
+			// 扣去用户积分
+			$pointRecord = new PointRecord();
+			$pointRecordAttribute = $pointRecord->setAttributes(Prize::LEGEND_PRIZE, '50积分抽奖', 1, -5, $user->u_current_point);
+			PointRecord::insert($pointRecordAttribute);
 
-            if (isset($result)) {
-                if (strpos($prizeList[$result]->p_name, '30优惠券')) {
-                    $couponCode = DB::table('coupon_codes')->where(['cc_type' => 1, 'cc_used' => 0])->first();
-                } elseif (strpos($prizeList[$result]->p_name, '50优惠券')) {
-                    $couponCode = DB::table('coupon_codes')->where(['cc_type' => 2, 'cc_used' => 0])->first();
-                }
+			if (isset($result)) {
+				if (strpos($prizeList[$result]->p_name, '30优惠券')) {
+					$couponCode = DB::table('coupon_codes')->where(['cc_type' => 1, 'cc_used' => 0])->first();
+				} elseif (strpos($prizeList[$result]->p_name, '50优惠券')) {
+					$couponCode = DB::table('coupon_codes')->where(['cc_type' => 2, 'cc_used' => 0])->first();
+				}
 
-                // 插入用户中奖数据
-                $userPrize = UserPrize::create([
-                    'up_uid'        => $user->u_id,
-                    'up_type'       => '抽奖',
-                    'up_prize_id'   => $prizeList[$result]->p_id,
-                    'up_code'       => isset($couponCode) ? $couponCode->cc_code : strtoupper(substr(md5(time().mt_rand(1000, 9999)), 0, 20))
-                ]);
-                // 修改优惠券码为已使用
-                if (isset($couponCode)) {
-                    DB::table('coupon_codes')->where('cc_id', $couponCode->cc_id)->update(['cc_used' => 1, 'cc_up_id' => $userPrize->up_id]);
-                }
+				// 插入用户中奖数据
+				$userPrize = UserPrize::create([
+					'up_uid'        => $user->u_id,
+					'up_type'       => '抽奖',
+					'up_prize_id'   => $prizeList[$result]->p_id,
+					'up_code'       => isset($couponCode) ? $couponCode->cc_code : strtoupper(substr(md5(time().mt_rand(1000, 9999)), 0, 20))
+				]);
+				// 修改优惠券码为已使用
+				if (isset($couponCode)) {
+					DB::table('coupon_codes')->where('cc_id', $couponCode->cc_id)->update(['cc_used' => 1, 'cc_up_id' => $userPrize->up_id]);
+				}
 
-                Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
-                $data = [
-                    'name'      => $prizeList[$result]->p_name,
-                    'img'       => $prizeList[$result]->p_img,
-                    'received'  => 0,
-                    'code'      => $userPrize->up_code,
-                    'id'        => $prizeList[$result]->p_id,
-                    'needSaveInfo' => strpos($prizeList[$result]->name, '跑鞋') ? 1 : 0,
-                    'isCoupon' => strpos($prizeList[$result]->name, '优惠券') ? 1 : 0,
-                ];
-            }
+				Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
+				$data = [
+					'name'      => $prizeList[$result]->p_name,
+					'img'       => $prizeList[$result]->p_img,
+					'received'  => 0,
+					'code'      => $userPrize->up_code,
+					'id'        => $prizeList[$result]->p_id,
+					'needSaveInfo' => strpos($prizeList[$result]->name, '跑鞋') ? 1 : 0,
+					'isCoupon' => strpos($prizeList[$result]->name, '优惠券') ? 1 : 0,
+				];
+			}
 
-            DB::commit();
-            return $this->responseSuccess($data);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return $this->responseFail('No Enough Point To Lottery!');
-        }
+			DB::commit();
+			return $this->responseSuccess(['pointIsNotEnough' => 0, 'data' => $data]);
+		} catch (\Exception $e) {
+			DB::rollBack();
+			return $this->responseFail($e->getMessage());
+		}
 	}
 
     /**
@@ -421,25 +433,24 @@ class ApiController extends Controller
     public function exchangePrizes()
     {
         $user = Auth::user();
-        $prizeList = Prize::where(['p_type' => Prize::EXCHANGE_PRIZE, 'p_account_id' => $user->u_account_id])->limit(8)->get();
 
         $data = [];
-        if (count($prizeList) > 0) {
-            foreach ($prizeList as $key => $prize) {
-                $data[] = [
-                    'id'        => $prize->p_id,
-                    'name'      => $prize->p_name,
-//                    'thumb'     => $prize->p_thumb,
-                    'img'       => $prize->p_img,
-                    'point'     => $prize->p_point,
-                    'applyCity' => $prize->p_apply_city,
-                    'applyShop' => $prize->p_apply_shop,
-                    'rule'      => $prize->p_rule,
-                    'deadline'  => $prize->p_deadline,
-                    'phoneNumber' => $prize->p_phone_number
-                ];
-            }
-        }
+        Prize::where(['p_type' => Prize::EXCHANGE_PRIZE, 'p_account_id' => $user->u_account_id])
+			->limit(8)
+			->get()
+			->map(function ($prize) use (&$data) {
+				$data[] = [
+					'id'        => $prize->p_id,
+					'name'      => $prize->p_name,
+					'img'       => $prize->p_img,
+					'point'     => $prize->p_point,
+					'applyCity' => $prize->p_apply_city,
+					'applyShop' => $prize->p_apply_shop,
+					'rule'      => $prize->p_rule,
+					'deadline'  => $prize->p_deadline,
+					'phoneNumber' => $prize->p_phone_number
+				];
+			});
 
         return $this->responseSuccess($data);
     }
@@ -452,13 +463,14 @@ class ApiController extends Controller
     public function exchange(Request $request)
     {
         $user = Auth::user();
+
         $id = $request->input('id');
         $prize = Prize::where(['p_id' => $id, 'p_type' => Prize::EXCHANGE_PRIZE])->first();
         if (!$prize) {
             return $this->responseFail('[ID] Prize Not Found!');
         }
         if ($user->u_current_point < $prize->p_point) {
-            return $this->responseFail('No Enough Point To Exchange!');
+            return $this->responseSuccess(['pointIsNotEnough' => 1, 'data' => 0]);
         }
 
         DB::beginTransaction();
@@ -468,7 +480,7 @@ class ApiController extends Controller
 
             // 扣去用户积分
             $pointRecord = new PointRecord();
-            $pointRecordAttribute = $pointRecord->setAttributes(Prize::EXCHANGE_PRIZE, $prize->p_point.'积分兑换', 1, $prize->p_point, $user->u_current_point);
+            $pointRecordAttribute = $pointRecord->setAttributes(Prize::EXCHANGE_PRIZE, $prize->p_point.'积分兑换', 1, -$prize->p_point, $user->u_current_point);
             PointRecord::insert($pointRecordAttribute);
 
             // 插入用户中奖数据
@@ -481,7 +493,7 @@ class ApiController extends Controller
             Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::EXCHANGE_PRIZE])->increment('p_receive_number');
 
             DB::commit();
-            return $this->responseSuccess(1);
+			return $this->responseSuccess(['pointIsNotEnough' => 0, 'data' => $user->u_current_point]);
         } catch (\Exception $e) {
             DB::rollback();
             return $this->responseFail($e->getMessage());
@@ -506,12 +518,6 @@ class ApiController extends Controller
             ->limit($pageSize)
             ->get();
 
-        $data = [];
-        if (count($userPrize) > 0) {
-            foreach ($userPrize as $key => $prize) {
-                $data[$key] = $prize;
-            }
-        }
         return $this->responseSuccess($userPrize);
     }
 }

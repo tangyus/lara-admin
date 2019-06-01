@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Admin\Extensions\PointRecordExporter;
 use App\Admin\Extensions\UserExporter;
+use App\model\Account;
 use App\Model\PointRecord;
 use App\Model\User;
 use App\Http\Controllers\Controller;
@@ -100,6 +101,13 @@ class UserController extends Controller
     protected function grid()
     {
         $grid = new Grid(new User);
+        $grid->model()->where(function ($query) {
+			if (Admin::user()->isRole('市场人员')) {
+				// 修改数据来源
+				$account = Account::where('a_account', Admin::user()->username)->first();
+				$query->where('u_account_id', $account->a_id);
+			}
+		});
         $grid->exporter(new UserExporter());
 
         $grid->u_id('ID');
@@ -190,13 +198,23 @@ class UserController extends Controller
     {
         $grid = new Grid(new PointRecord());
         $grid->exporter(new PointRecordExporter());
+        $grid->model()->leftJoin('users', 'u_id', 'pr_uid')
+			->leftJoin('accounts', 'a_id', 'u_account_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('u_account_id', $account->a_id);
+				}
+			})
+			->orderBy('pr_updated', 'desc');
 
         $grid->pr_id('ID');
-        $grid->user()->u_city('城市');
-//        $grid->user()->u_openid('openID');
-        $grid->user()->u_nick('用户昵称');
-        $grid->user()->u_headimg('用户头像')->image('', 64, 64);
-        $grid->user()->u_phone('用户手机号');
+        $grid->a_district('区域');
+        $grid->u_city('城市');
+        $grid->u_nick('用户昵称');
+        $grid->u_headimg('用户头像')->image('', 64, 64);
+        $grid->u_phone('用户手机号');
         $grid->pr_prize_type('礼品类型');
         $grid->pr_prize_name('礼品名称');
         $grid->pr_point('积分')->display(function ($point) {

@@ -2,6 +2,7 @@
 
 namespace App\Admin\Extensions;
 
+use App\model\Account;
 use App\model\Qrcode;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid;
@@ -41,6 +42,14 @@ class QrcodeExporter extends ExcelExporter
 
     public function query()
     {
-        return Qrcode::query()->leftJoin('accounts', 'q_account_id', 'a_id')->select(array_keys($this->columns));
+        return Qrcode::query()->leftJoin('accounts', 'q_account_id', 'a_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('q_account_id', $account->a_id);
+				}
+			})
+			->select(array_keys($this->columns));
     }
 }
