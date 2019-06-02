@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Model\User;
 use EasyWeChat\Factory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -18,27 +19,29 @@ class AuthController extends Controller
      */
 	public function auth(Request $request)
 	{
-		$s3rd = $request->header('s3rd');
 		$code = $request->input('code', '');
 
-		$user = User::where('u_token', $s3rd)->first();
-		if ($user && $user->u_expired > time()) {
+		if (Auth::user() && Auth::user()->u_expired > time()) {
 			// access_token 未过期
-            return $this->responseSuccess($user->u_token);
+			return $this->responseSuccess(Auth::user()->u_token);
 		}
 
 		$app = Factory::miniProgram(config('miniprogram'));
 		$response = $app->auth->session($code);
         if (!empty($response['openid'])) {
             // access_token 需确保数据库唯一
-            $token = sha1($response['session_key'] . uniqid());
+            $token = sha1($response['session_key'] . uniqid() . time());
             $expired = time() + 7000;
 
             // 3. 判断 openID 对应用户是否存在
             $user = User::where('u_openid', $response['openid'])->first();
             if ($user) {
+            	$where = ['u_openid' => $response['openid']];
+            	if (Auth::user()) {
+					$where = array_merge($where, ['u_id' => Auth::id()]);
+				}
                 // 存在则更新 token
-                User::where('u_openid', $response['openid'])->update([
+                User::where($where)->update([
                     'u_sessionkey'  => $response['session_key'],
                     'u_token'       => $token,
                     'u_expired'     => $expired,

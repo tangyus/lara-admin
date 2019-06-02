@@ -117,9 +117,11 @@ class ApiController extends Controller
 		$user = Auth::user();
 		$userAll = User::where('u_openid', $user->u_openid)->get();
 		$cities = [];
-		foreach ($userAll as $item) {
-			if (!empty($item->u_city)) {
-				array_push($cities, $item->u_city);
+		if (count($userAll) > 1) {
+			foreach ($userAll as $item) {
+				if (!empty($item->u_city)) {
+					array_push($cities, $item->u_city);
+				}
 			}
 		}
 
@@ -202,7 +204,7 @@ class ApiController extends Controller
 			->limit($pageSize)
 			->get()
 			->map(function ($item) use (&$data) {
-				$list[] = [
+				$data[] = [
 					'id'            => $item['pr_id'],
 					'point' 		=> $item['pr_point'],
 					'currentPoint' 	=> $item['pr_current_point'],
@@ -272,7 +274,12 @@ class ApiController extends Controller
 					'name'      => $prize->p_name,
 					'img'       => $prize->p_img,
 					'isShoe'    => strpos($prize->p_name, '跑鞋') ? 1 : 0,
-					'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0
+					'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0,
+					'applyCity'	=> $prize->p_apply_city,
+					'applyShop'	=> $prize->p_apply_shop,
+					'rule'		=> $prize->p_rule,
+					'deadline'	=> $prize->p_deadline,
+					'phoneNumber'	=> $prize->p_phone_number,
 				];
 			});
 
@@ -282,7 +289,12 @@ class ApiController extends Controller
 			'thumb'     => '',
 			'img'       => '',
 			'isShoe'    => 0,
-			'isCoupon'  => 0
+			'isCoupon'  => 0,
+			'applyCity'	=> '',
+			'applyShop'	=> '',
+			'rule'		=> '',
+			'deadline'	=> '',
+			'phoneNumber'	=> '',
 		];
 
         return $this->responseSuccess($data);
@@ -362,9 +374,15 @@ class ApiController extends Controller
 					'img'       => $prizeList[$result]->p_img,
 					'received'  => 0,
 					'code'      => $userPrize->up_code,
-					'id'        => $prizeList[$result]->p_id,
+					'aid'        => $prizeList[$result]->p_id,
 					'needSaveInfo' => strpos($prizeList[$result]->name, '跑鞋') ? 1 : 0,
-					'isCoupon' => strpos($prizeList[$result]->name, '优惠券') ? 1 : 0,
+					'isCoupon' 	=> strpos($prizeList[$result]->name, '优惠券') ? 1 : 0,
+					'id'		=> $userPrize->up_id,
+					'applyCity'	=> $prizeList[$result]->p_apply_city,
+					'applyShop'	=> $prizeList[$result]->p_apply_shop,
+					'rule'		=> $prizeList[$result]->p_rule,
+					'deadline'	=> $prizeList[$result]->p_deadline,
+					'phoneNumber'	=> $prizeList[$result]->p_phone_number,
 				];
 			}
 
@@ -388,7 +406,7 @@ class ApiController extends Controller
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
-            ->select(DB::raw('p_name as name, p_img as img, up_received as received, up_code as code, up_id as id'))
+            ->select(DB::raw('p_name as name, p_img as img, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop as applyShop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)

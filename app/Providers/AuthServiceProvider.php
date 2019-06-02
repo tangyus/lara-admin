@@ -27,13 +27,20 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        $where['u_token'] = request()->header('s3rd');
-        if (!empty(request()->header('city', ''))) {
-            // 城市切换
-            $where['u_city'] = request()->header('city');
-        }
+		$user = null;
+        if (!empty(request()->input('city', ''))) {
+        	$currentUser = User::where('u_token', request()->header('s3rd'))->first();
+        	if ($currentUser) {
+				// 城市切换
+				$user = User::where(['u_openid' => $currentUser->u_openid, 'u_city' => request()->input('city')])->first();
+				$user->u_token = sha1($user->u_sessionkey . uniqid() . time());
+				$user->save();
+			}
+        } else {
+			$where['u_token'] = request()->header('s3rd');
+			$user = User::where($where)->first();
+		}
 
-        $user = User::where($where)->first();
         if ($user) {
             Auth::setUser($user);
         }
