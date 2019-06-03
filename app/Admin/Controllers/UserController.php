@@ -8,6 +8,7 @@ use App\model\Account;
 use App\Model\PointRecord;
 use App\Model\User;
 use App\Http\Controllers\Controller;
+use App\Model\UserPrize;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid;
@@ -91,6 +92,23 @@ class UserController extends Controller
                 ['text' => '详情']
             )
             ->body($this->pointRecordDetail($id));
+    }
+
+    /**
+     * 用户积分列表
+     * @param Content $content
+     * @return Content
+     */
+    public function userPrize(Content $content)
+    {
+        return $content
+            ->header('用户奖品列表')
+            ->description('奖品列表')
+            ->breadcrumb(
+                ['text' => '奖品列表', 'url' => '/users/prize'],
+                ['text' => '奖品列表']
+            )
+            ->body($this->userPrizeGrid());
     }
 
     /**
@@ -222,12 +240,6 @@ class UserController extends Controller
         });
         $grid->pr_created('时间');
         $grid->pr_current_point('当前用户积分');
-        $grid->shop()->s_name('使用门店')->expand(function ($model) {
-            $info = $model->shop()->get()->map(function ($item) {
-                return $item->only(['s_number', 's_name', 's_manager', 's_manager_phone']);
-            });
-            return new Table(['门店序号', '门店名称', '门店负责人姓名', '门店负责人电话'], $info->toArray());
-        });
 
         $grid->disableCreateButton();
         $grid->disableRowSelector();
@@ -287,12 +299,6 @@ class UserController extends Controller
                 $user->u_phone('用户手机号');
             });
         }
-        $show->shop('门店', function ($shop) {
-            $shop->s_name('使用门店');
-            $shop->s_number('门店序号');
-            $shop->s_manager('门店负责人姓名');
-            $shop->s_manager_phone('门店负责人电话');
-        });
         $show->user()->u_city('城市')->as(function ($user) {
             return $user->u_city;
         });
@@ -308,5 +314,64 @@ class UserController extends Controller
         });
 
         return $show;
+    }
+
+    /**
+     * 用户积分记录
+     * @return Grid
+     */
+    protected function userPrizeGrid()
+    {
+        $grid = new Grid(new UserPrize());
+//        $grid->exporter(new PointRecordExporter());
+        $grid->model()->leftJoin('users', 'u_id', 'up_uid')
+            ->leftJoin('prizes', 'p_id', 'up_prize_id')
+            ->leftJoin('shops', 's_id', 'up_shop_id')
+            ->where(function ($query) {
+                if (Admin::user()->isRole('市场人员')) {
+                    // 修改数据来源
+                    $account = Account::where('a_account', Admin::user()->username)->first();
+                    $query->where('u_account_id', $account->a_id);
+                }
+            })
+            ->orderBy('up_created', 'desc');
+
+        $grid->up_id('ID');
+        $grid->up_type('中奖类型');
+        $grid->u_city('城市');
+        $grid->u_nick('用户昵称');
+        $grid->u_headimg('用户头像')->image('', 64, 64);
+        $grid->u_phone('用户手机号');
+        $grid->p_name('奖品名称');
+        $grid->p_type('奖品类型');
+        $grid->up_received('是否领取')->using(['否', '是']);
+        $grid->up_code('券码');
+        $grid->s_name('核销门店')->expand(function ($model) {
+            return new Table(['所在城市', '门店编号', '门店名称', '负责人', '负责人电话', '门店地址'], [0 => [
+                $model->s_city,
+                $model->s_number,
+                $model->s_name,
+                $model->s_manager,
+                $model->s_manager_phone,
+                $model->s_address
+            ]]);
+        });
+        $grid->up_created('时间');
+
+        $grid->disableCreateButton();
+        $grid->disableRowSelector();
+        $grid->disableExport();
+
+        // 数据查询过滤
+        $grid->disableFilter();
+
+        // 禁用 编辑和删除
+        $grid->actions(function ($actions) {
+            $actions->disableDelete();
+            $actions->disableEdit();
+            $actions->disableView();
+        });
+
+        return $grid;
     }
 }

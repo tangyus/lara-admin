@@ -98,6 +98,7 @@ class RuleController extends Controller
         $grid->r_id('ID');
         $grid->r_act_img('活动规则图')->image();
         $grid->r_rule_img('传奇礼规则图')->image();
+        $grid->r_point_img('积分礼规则图')->image();
         $grid->r_created('创建时间');
         $grid->r_updated('更新时间');
 
@@ -134,6 +135,7 @@ class RuleController extends Controller
         });
         $show->r_act_img('活动规则图')->image();
         $show->r_rule_img('传奇礼规则图')->image();
+        $show->r_point_img('积分礼规则图')->image();
         $show->r_created('创建时间');
         $show->r_updated('更新时间');
 
@@ -176,6 +178,7 @@ class RuleController extends Controller
         });
         $form->image('r_act_img', '活动规则图')->move('rules');
         $form->image('r_rule_img', '传奇礼规则图')->move('rules');
+        $form->image('r_point_img', '积分礼规则图')->move('rules');
 
         return $form;
     }

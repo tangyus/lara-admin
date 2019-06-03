@@ -14,6 +14,7 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
+use Illuminate\Http\Request;
 
 class ShopController extends Controller
 {
@@ -109,9 +110,13 @@ class ShopController extends Controller
 
     public function shopsList()
     {
-        $shops = Shop::get(['s_id as id', 's_name as text']);
-
-        return $shops;
+        return Shop::where(function ($query) {
+                if (Admin::user()->isRole('市场人员')) {
+                    $account = Account::where('a_account', Admin::user()->username)->first();
+                    $query->where('s_account_id', $account->a_id);
+                }
+            })
+            ->get(['s_id as id', 's_name as text']);
     }
 
     /**
@@ -168,6 +173,9 @@ class ShopController extends Controller
         $grid->s_number('门店序号');
         $grid->s_name('门店名称');
         $grid->s_city('门店所在城市');
+        $grid->s_phone('门店联系电话');
+        $grid->s_target('销售目标');
+        $grid->s_sales('实际销量');
         $grid->s_manager('门店负责人姓名');
         $grid->s_manager_phone('门店负责人电话');
         $grid->s_password('门店核销密码');
@@ -213,7 +221,10 @@ class ShopController extends Controller
 
         $show->s_name('门店名称');
         $show->s_number('门店序号');
-        $show->s_city('所在城市');
+        $show->s_city('门店所在城市');
+        $show->s_phone('门店联系电话');
+        $show->s_target('销售目标');
+        $show->s_sales('实际销量');
         $show->s_manager('门店负责人姓名');
         $show->s_manager_phone('门店负责人电话');
         $show->s_password('门店核销密码');
@@ -266,13 +277,16 @@ class ShopController extends Controller
 
         $form->text('s_name', '门店名称')->rules('required', ['required' => '请输入门店名称']);
         $form->text('s_city', '门店所在城市')->rules('required', ['required' => '请输入门店所在城市']);
+        $form->text('s_phone', '门店联系电话')->rules('required', ['required' => '请输入门店所在城市']);
+        $form->text('s_target', '销售目标')->rules('required|integer|min:0', ['required' => '请输入销售目标', 'integer' => '销售目标必须为整数', 'min' => '销售目标不能为负数']);
+        $form->text('s_sales', '实际销量')->rules('integer|min:0', ['integer' => '实际销量必须为整数', 'min' => '实际销量不能为负数']);
         $form->text('s_manager', '门店负责人')->rules('required', ['required' => '请输入门店联系人姓名']);
         $form->text('s_manager_phone', '负责人电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
             'required'  => '请输入门店负责人电话',
             'regex'     => '电话号码非法'
         ]);
         $form->text('s_address', '门店地址')->rules('required', ['required' => '请输入门店地址']);
-        $form->password('s_password', '门店核销密码')->placeholder('市场人员与门店负责人确认，建议设置为门店负责人手机号')->rules('required', ['required' => '请输入门店核销密码']);
+        $form->text('s_password', '门店核销密码')->placeholder('市场人员与门店负责人确认，建议设置为门店负责人手机号')->rules('required', ['required' => '请输入门店核销密码']);
         $form->switch('s_state', '是否停用')->states($this->states);
 
         $form->tools(function (Form\Tools $tools) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\model\Prize;
 use App\model\Shop;
 use App\Model\UserPrize;
 use EasyWeChat\Factory;
@@ -88,12 +89,12 @@ class IndexController extends Controller
         $prizeCode = $request->input('code');
         $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode, 'up_received' => 0])->first();
         if (!$userPrize) {
-            return $this->responseFail('Invalid Code!');
+            return $this->responseFail('该奖品已核销或券码无效');
         }
 
         return $this->responseSuccess([
             'id'            => $userPrize->up_id,
-            'nickName'      => $userPrize->user->u_nick,
+            'nickName'      => !empty($userPrize->user->nick) ? $userPrize->user->u_nick : '测试',
             'prizeName'     => $userPrize->prize->p_name,
             'prizeThumb'    => $userPrize->prize->p_thumb
         ]);
@@ -119,11 +120,16 @@ class IndexController extends Controller
             return $this->responseFail('门店序号或密码不正确!');
         }
 
-        $res = UserPrize::where(['up_id' => $id, 'up_received' => 0])->update(['up_received' => 1, 'up_shop_id' => $this->shop->s_id]);
-        if ($res) {
-            return $this->responseSuccess($res);
+        $userPrize = UserPrize::where(['up_id' => $id, 'up_received' => 0])->first();
+        if ($userPrize) {
+            $userPrize->up_received = 1;
+            $userPrize->up_shop_id = $this->shop->s_id;
+            $userPrize->save();
+
+            Prize::where(['p_id' => $userPrize->up_prize_id])->increment('p_used_number', 1);
+            return $this->responseSuccess(1);
         } else {
-            return $this->responseFail('核销异常，核销码不正确!');
+            return $this->responseFail('该奖品已核销或券码无效');
         }
     }
 
@@ -144,8 +150,8 @@ class IndexController extends Controller
             ->get()
             ->map(function ($item) use (&$data) {
                 $data[] = [
-                    'nick'      => $item->user->u_nick,
-                    'phone'     => $item->user->u_phone,
+                    'nick'      => !empty($item->user->nick) ? $item->user->u_nick : '测试',
+                    'phone'     => $item->user ? $item->user->u_phone : '',
                     'prizeType' => $item->prize->p_type,
                     'prizeName' => $item->prize->p_name,
                     'date'      => $item->up_updated->format('Y-m-d'), // diffForHumans
@@ -156,10 +162,15 @@ class IndexController extends Controller
         return $this->responseSuccess($data);
     }
 
-    public function jssdk()
+    /*
+     * 获取jssdk
+     * @param Request $request
+     * @return array|string
+     */
+    public function jssdk(Request $request)
     {
+        $id = $request->input('id', '');
         // TY wx1c46b3106e3c6bc5 11c7d0796822535df1a4d7eabb3c6fdc
-        // 百事 wx97ba3ea86432e115 d268f390922bffd60c98bc93705ed6c7
         $config = [
             'app_id' => 'wx1c46b3106e3c6bc5',
             'secret' => '11c7d0796822535df1a4d7eabb3c6fdc',
@@ -171,8 +182,10 @@ class IndexController extends Controller
         ];
         $app = Factory::officialAccount($config);
         $jssdkApi = ['checkJsApi', 'scanQRCode'];
-        $app->jssdk->setUrl('https://jifenyouli.pamierde.com/web/index.html');
+        $url = $id ? 'https://jifenyouli.pamierde.com/web/index.html?id='.$id : 'https://jifenyouli.pamierde.com/web/index.html';
+        $app->jssdk->setUrl($url);
         $response = $app->jssdk->buildConfig($jssdkApi, false, false, true);
+
         return $response;
     }
 }

@@ -22,4 +22,9 @@ class UserPrize extends Model
     {
         return $this->belongsTo(User::class, 'up_uid');
     }
+
+    public function shop()
+    {
+        return $this->belongsTo(Shop::class, 'ur_shop_id');
+    }
 }

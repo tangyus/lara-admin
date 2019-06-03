@@ -18,11 +18,6 @@ class PointRecord extends Model
         return $this->belongsTo(User::class, 'pr_uid');
     }
 
-    public function shop()
-    {
-        return $this->belongsTo(Shop::class, 'pr_shop_id');
-    }
-
     public function setAttributes(...$args)
     {
         return [

@@ -163,8 +163,8 @@ class PrizeController extends Controller
 			]]);
 		});
         $grid->p_number('礼品数量');
-        $grid->p_current_number('剩余数量')->display(function () {
-        	return $this->p_number - $this->p_received_number;
+        $grid->p_current_number('剩余数量(总量-已核销)')->display(function () {
+        	return $this->p_number - $this->p_used_number;
 		});
         if (Admin::user()->cannot('prizes.create')) {
             $grid->p_state('是否停用')->using(['否', '是']);
@@ -175,7 +175,7 @@ class PrizeController extends Controller
         } else {
             $grid->p_state('是否停用')->switch($this->states);
         }
-//        $grid->p_img('礼品图')->image('', 100, 100);
+        $grid->p_img('礼品图')->image('', 100, 100);
 //        $grid->p_thumb('礼品缩略图')->image('', 100, 100);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
@@ -219,8 +219,8 @@ class PrizeController extends Controller
         $show->p_rate('中奖概率')->as(function ($rate) {
             return is_null($rate) ? '-' : $rate . '%';
         });
-//        $show->p_img('礼品图')->image();
-        $show->p_thumb('礼品缩略图')->image();
+        $show->p_img('礼品图')->image();
+//        $show->p_thumb('礼品缩略图')->image();
         $show->p_created('创建时间');
         $show->p_updated('修改时间');
 
@@ -264,14 +264,14 @@ class PrizeController extends Controller
         $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
         $form->text('p_point', '兑换所需积分')->default(0)->disable();
         $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->disable();
-        $form->text('p_apply_city', '适用城市');
+        $form->multipleSelect('p_apply_city', '适用城市')->options('/admin/shops_list');
         $form->text('p_apply_shop', '适用门店');
         $form->text('p_rule', '领取规则');
         $form->datetime('p_deadline', '领取截止时间');
         $form->text('p_phone_number', '活动热线');
 
-//        $form->image('p_img', '礼品图')->move('prizes')->rules('required', ['required' => '请上传礼品图']);
-        $form->image('p_thumb', '礼品缩略图')->move('prizes')->rules('required', ['required' => '请上传礼品缩略图']);
+        $form->image('p_img', '礼品图')->move('prizes')->rules('required', ['required' => '请上传礼品图']);
+//        $form->image('p_thumb', '礼品缩略图')->move('prizes')->rules('required', ['required' => '请上传礼品缩略图']);
         $form->switch('p_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {
