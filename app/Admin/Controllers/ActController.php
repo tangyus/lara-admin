@@ -61,6 +61,7 @@ class ActController extends Controller
         $grid->disableCreateButton();
         $grid->disableRowSelector();
         $grid->disableActions();
+        $grid->disableFilter();
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
         });

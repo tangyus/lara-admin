@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\model\Account;
 use App\model\Code;
 use App\Model\PointRecord;
 use App\model\Prize;
 use App\Model\Rule;
+use App\model\Shop;
 use App\Model\User;
 use App\Model\UserPrize;
 use Carbon\Carbon;
@@ -24,14 +26,39 @@ class ApiController extends Controller
     public function codeCheck(Request $request)
     {
         $code = $request->input('code');
+        $nick = $request->input('nick');
+        $head = $request->input('head');
+        $phone = $request->input('phone');
 
         $user = Auth::user();
         $codeInfo = Code::leftJoin('qrcodes', 'q_id', 'c_qrcode_id')
+            ->leftJoin('accounts', 'a_id', 'q_account_id')
             ->where(['c_code' => $code])
             ->first();
         if ($codeInfo && $codeInfo->c_used == 0) {
+            if (!empty($codeInfo->a_scan_times)) {
+                $count = PointRecord::where(['pr_uid' => $user->u_id, 'pr_prize_name' => '产品购买'])->whereDay('pr_created', Carbon::today())->count();
+                if ($codeInfo->a_scan_times - $count <= 0) {
+                    return response()->json([
+                        'result' 	=> 1002,
+                        'message' 	=> 'Scan times limit!',
+                        'data' 		=> [],
+                    ]);
+                }
+            }
             if (time() > strtotime($codeInfo->q_expired)) {
-                return $this->responseFail('Code Is Expired!');
+                User::where('u_id', Auth::id())->update([
+                    'u_city'            => $codeInfo->q_city,
+                    'u_account_id'      => $codeInfo->q_account_id,
+                    'u_nick'            => $nick,
+                    'u_headimg'         => $head,
+                    'u_phone'           => $phone
+                ]);
+                return response()->json([
+                    'result' 	=> 1001,
+                    'message' 	=> 'Code Is Expired!',
+                    'data' 		=> [],
+                ]);
             }
 
             DB::beginTransaction();
@@ -70,7 +97,10 @@ class ApiController extends Controller
                     'u_current_point'   => $user->u_current_point + $point,
                     'u_total_point'     => $user->u_total_point + $point,
                     'u_city'            => $codeCity,
-                    'u_account_id'      => $codeInfo->q_account_id
+                    'u_account_id'      => $codeInfo->q_account_id,
+                    'u_nick'            => $nick,
+                    'u_headimg'         => $head,
+                    'u_phone'           => $phone
                 ]);
 
                 $pointRecord = new PointRecord();
@@ -104,10 +134,13 @@ class ApiController extends Controller
                 return $this->responseFail($e->getMessage());
             }
         } else {
-            if (empty($user->u_city)) {
+            if ($codeInfo && empty($user->u_city)) {
                 User::where('u_id', Auth::id())->update([
                     'u_city'            => $codeInfo->q_city,
-                    'u_account_id'      => $codeInfo->q_account_id
+                    'u_account_id'      => $codeInfo->q_account_id,
+                    'u_nick'            => $nick,
+                    'u_headimg'         => $head,
+                    'u_phone'           => $phone
                 ]);
             }
             return $this->responseFail('Invalid Code!');
@@ -132,7 +165,7 @@ class ApiController extends Controller
 		}
 
 		// 活动规则
-        $rule = Rule::where('r_account_id', $user->u_account_id)->first();
+        $rule = Rule::first();
 
         // 新人奖
         $newPrize = PointRecord::where(['pr_prize_type' => Prize::NEW_PRIZE, 'pr_uid' => $user->u_id])->first();
@@ -171,20 +204,27 @@ class ApiController extends Controller
 		} else {
             $advancePrize = ($advancePrizeData->pr_received == 0) ? 1 : 2;
 		}
+        $account = Account::find($user->u_account_id);
+        $count = DB::table('lottery_logs')->where(['ll_uid' => $user->u_id, 'll_day' => strtotime('today')])->count();
 
 		return $this->responseSuccess([
 			'user' 	=> [
 				'nick' 			=> $user->u_nick,
+				'headimg' 		=> $user->u_headimg,
 				'phone' 		=> $user->u_phone,
 				'currentPoint' 	=> $user->u_current_point,
 				'currentCity'  	=> $user->u_city,
                 'newPrize'      => $newPrize,
                 'advancePrize'  => $advancePrize,
                 'dateArr'       => $dateArr,
-                'actImg'        => $rule ? $rule->r_act_img : '',
-                'ruleImg'       => $rule ? $rule->r_rule_img : '',
-                'pointImg'      => $rule ? $rule->r_point_img : '',
-                'hasScanCode'   => !empty($user->u_city) ? 1 : 0
+                'mainRuleImg'   => $rule ? $rule->r_act_img : '',
+                'pointRuleImg'  => $rule ? $rule->r_rule_img : '',
+                'legendRuleImg' => $rule ? $rule->r_point_img : '',
+                'hasScanCode'   => !empty($user->u_city) ? 1 : 0,
+                'todayCanLotteryCount' => $account ? $account->a_scan_times - $count : 0,
+                'hotLine'       => $account->a_hot_line,
+                'workTime'      => $account->a_work_time,
+                'sponsor'       => $account->a_sponsor
 			],
 			'cities' => $cities
 		]);
@@ -273,37 +313,45 @@ class ApiController extends Controller
     {
         $user = Auth::user();
 
+        $shops = Shop::where('s_account_id', $user->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
 		$data = [];
-        Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id ? $user->u_account_id : 8])
+        Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])
 			->limit(8)
 			->get()
-			->map(function ($prize, $key) use (&$data) {
+			->map(function ($prize, $key) use (&$data, $shops) {
 				$data[$key + 1] = [
-					'aid'       => $prize->p_id,
-					'name'      => $prize->p_name,
-					'img'       => $prize->p_img,
-					'isShoe'    => strpos($prize->p_name, '跑鞋') ? 1 : 0,
-					'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0,
-					'applyCity'	=> $prize->p_apply_city,
-					'applyShop'	=> $prize->p_apply_shop,
-					'rule'		=> $prize->p_rule,
-					'deadline'	=> $prize->p_deadline,
+					'aid'           => $prize->p_id,
+					'name'          => $prize->p_name,
+					'img'           => $prize->p_img,
+					'needSaveInfo'  => strpos($prize->p_name, '鞋') ? 1 : 0,
+					'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+					'applyShop'	    => $prize->p_apply_shop,
+					'applyCity'	    => $prize->p_apply_city,
+					'rule'		    => $prize->p_rule,
+					'deadline'	    => $prize->p_deadline,
 					'phoneNumber'	=> $prize->p_phone_number,
+                    'shops'         => []
 				];
+                foreach ($shops as $shop) {
+                    if (in_array($shop->s_id, $prize->p_apply_shop)) {
+                        $data[$key + 1]['shops'][] = $shop->s_name;
+                    }
+                }
 			});
 
 		$data[-1] = [
-			'aid'       => 0,
-			'name'      => '立即抽奖',
-			'thumb'     => '',
-			'img'       => '',
-			'isShoe'    => 0,
-			'isCoupon'  => 0,
-			'applyCity'	=> '',
-			'applyShop'	=> '',
-			'rule'		=> '',
-			'deadline'	=> '',
+			'aid'           => 0,
+			'name'          => '立即抽奖',
+			'thumb'         => '',
+			'img'           => '',
+			'needSaveInfo'  => 0,
+			'isCoupon'      => 0,
+			'applyCity'	    => '',
+			'applyShop'	    => '',
+			'rule'		    => '',
+			'deadline'	    => '',
 			'phoneNumber'	=> '',
+            'shops'         => []
 		];
 
         return $this->responseSuccess($data);
@@ -318,14 +366,27 @@ class ApiController extends Controller
         $user = Auth::user();
 
         $data = [
-            'name'      => '',
-            'img'       => '',
-            'received'  => 0,
-            'code'      => '',
-            'id'        => '',
-            'needSaveInfo' => '',
-            'isCoupon' => '',
+            'name'          => '',
+            'img'           => '',
+            'received'      => 0,
+            'code'          => '',
+            'id'            => '',
+            'needSaveInfo'  => '',
+            'isCoupon'      => '',
         ];
+
+        $account = Account::find($user->u_account_id);
+        if ($account && !empty($account->a_scan_times)) {
+            $count = DB::table('lottery_logs')->where(['ll_uid' => $user->u_id, 'll_day' => strtotime('today')])->count();
+            if ($account->a_scan_times - $count <= 0) {
+                response()->json([
+                    'result' 	=> 1001,
+                    'message' 	=> 'Today has lottery!',
+                    'data' 		=> [],
+                ]);
+            }
+        }
+
         if ($user->u_current_point < 5) {
 			return $this->responseSuccess(['pointIsNotEnough' => 1, 'data' => $data]);
 		}
@@ -334,6 +395,7 @@ class ApiController extends Controller
 			$user->u_current_point = $user->u_current_point - 5;
 			$user->save();
 
+            DB::table('lottery_logs')->insert(['ll_uid' => $user->u_id, 'll_day' => strtotime('today'), 'll_created' => date('Y-m-d H:i:s')]);
 			$prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])->get();
 			$randArr = [];
 			foreach ($prizeList as $item) {
@@ -374,20 +436,27 @@ class ApiController extends Controller
 
 				Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
 				$data = [
-					'name'      => $prizeList[$result]->p_name,
-					'img'       => $prizeList[$result]->p_img,
-					'received'  => 0,
-					'code'      => $userPrize->up_code,
-					'aid'        => $prizeList[$result]->p_id,
-					'needSaveInfo' => strpos($prizeList[$result]->p_name, '跑鞋') ? 1 : 0,
-					'isCoupon' 	=> strpos($prizeList[$result]->p_name, '优惠券') ? 1 : 0,
-					'id'		=> $userPrize->up_id,
-					'applyCity'	=> $prizeList[$result]->p_apply_city,
-					'applyShop'	=> $prizeList[$result]->p_apply_shop,
-					'rule'		=> $prizeList[$result]->p_rule,
-					'deadline'	=> $prizeList[$result]->p_deadline,
+					'name'          => $prizeList[$result]->p_name,
+					'img'           => $prizeList[$result]->p_img,
+					'received'      => 0,
+					'code'          => $userPrize->up_code,
+					'aid'           => $prizeList[$result]->p_id,
+					'needSaveInfo'  => strpos($prizeList[$result]->p_name, '鞋') ? 1 : 0,
+					'isCoupon' 	    => strpos($prizeList[$result]->p_name, '优惠券') ? 1 : 0,
+					'id'		    => $userPrize->up_id,
+					'applyCity'	    => $prizeList[$result]->p_apply_city,
+					'applyShop'	    => $prizeList[$result]->p_apply_shop,
+					'rule'		    => $prizeList[$result]->p_rule,
+					'deadline'	    => $prizeList[$result]->p_deadline,
 					'phoneNumber'	=> $prizeList[$result]->p_phone_number,
+                    'number'        => ''
 				];
+                Shop::whereIn('s_id', $prizeList[$result]->p_apply_shop)
+                    ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+                    ->get()
+                    ->map(function ($item) use (&$data) {
+                        $data['shops'][] = $item->s_name;
+                    });
 				$mark = $prizeList[$result]->p_name;
 			} else {
                 $mark = '积分抽奖';
@@ -414,18 +483,29 @@ class ApiController extends Controller
         $page = request()->input('page', 1);
         $pageSize = request()->input('pageSize', 10);
 
+        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
-            ->select(DB::raw('p_name as name, p_img as img, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop as applyShop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber'))
+            ->select(DB::raw('p_name as name, p_img as img, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
             ->get()
-            ->map(function ($item, $key) use (&$data) {
+            ->map(function ($item, $key) use (&$data, $shops) {
                 $data[$key] = $item;
-                $data[$key]['needSaveInfo'] = strpos($item->name, '跑鞋') ? 1 : 0;
+                $data[$key]['needSaveInfo'] = strpos($item->name, '鞋') ? 1 : 0;
                 $data[$key]['isCoupon'] = strpos($item->name, '优惠券') ? 1 : 0;
+                $applyShopIds = explode('-', $item->p_apply_shop);
+                $data[$key]['applyShop'] = $applyShopIds;
+
+                $tempShops = [];
+                foreach ($shops as $shop) {
+                    if (in_array($shop->s_id, $applyShopIds)) {
+                        $tempShops[] = $shop->s_name;
+                    }
+                }
+                $data[$key]['shops'] = $tempShops;
             });
 
         return $this->responseSuccess($data);
@@ -463,24 +543,31 @@ class ApiController extends Controller
     {
         $user = Auth::user();
 
+        $shops = Shop::where('s_account_id', $user->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
         $data = [];
         Prize::where(['p_type' => Prize::EXCHANGE_PRIZE, 'p_account_id' => $user->u_account_id])
 			->limit(8)
 			->get()
-			->map(function ($prize) use (&$data) {
-				$data[] = [
-					'id'        => $prize->p_id,
-					'name'      => $prize->p_name,
-					'img'       => $prize->p_img,
-					'point'     => $prize->p_point,
-					'applyCity' => $prize->p_apply_city,
-					'applyShop' => $prize->p_apply_shop,
-					'rule'      => $prize->p_rule,
-					'deadline'  => $prize->p_deadline,
-					'phoneNumber' => $prize->p_phone_number,
-                    'needSaveInfo' => strpos($prize->p_name, '跑鞋') ? 1 : 0,
-                    'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0
+			->map(function ($prize, $index) use (&$data, $shops) {
+				$data[$index] = [
+					'id'            => $prize->p_id,
+					'name'          => $prize->p_name,
+					'img'           => $prize->p_img,
+					'point'         => $prize->p_point,
+					'applyCity'     => $prize->p_apply_city,
+					'applyShop'     => $prize->p_apply_shop,
+					'rule'          => $prize->p_rule,
+					'deadline'      => $prize->p_deadline,
+					'phoneNumber'   => $prize->p_phone_number,
+                    'needSaveInfo'  => strpos($prize->p_name, '跑鞋') ? 1 : 0,
+                    'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+                    'shops'         => []
 				];
+                foreach ($shops as $shop) {
+                    if (in_array($shop->s_id, $prize->p_apply_shop)) {
+                        $data[$index]['shops'][] = $shop->s_name;
+                    }
+                }
 			});
 
         return $this->responseSuccess($data);
@@ -526,24 +613,29 @@ class ApiController extends Controller
             Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::EXCHANGE_PRIZE])->increment('p_receive_number');
 
             DB::commit();
-			return $this->responseSuccess([
-			    'pointIsNotEnough' => 0,
-                'data' => [
-                    'id'        => $prize->p_id,
-                    'name'      => $prize->p_name,
-                    'img'       => $prize->p_img,
-                    'point'     => $prize->p_point,
-                    'applyCity' => $prize->p_apply_city,
-                    'applyShop' => $prize->p_apply_shop,
-                    'rule'      => $prize->p_rule,
-                    'deadline'  => $prize->p_deadline,
-                    'phoneNumber' => $prize->p_phone_number,
-                    'code'      => $codeStr,
-                    'received'   => 0,
-                    'needSaveInfo' => strpos($prize->p_name, '跑鞋') ? 1 : 0,
-                    'isCoupon'  => strpos($prize->p_name, '优惠券') ? 1 : 0
-                ]
-            ]);
+            $data = [
+                'id'            => $prize->p_id,
+                'name'          => $prize->p_name,
+                'img'           => $prize->p_img,
+                'point'         => $prize->p_point,
+                'applyCity'     => $prize->p_apply_city,
+                'applyShop'     => $prize->p_apply_shop,
+                'rule'          => $prize->p_rule,
+                'deadline'      => $prize->p_deadline,
+                'phoneNumber'   => $prize->p_phone_number,
+                'code'          => $codeStr,
+                'received'      => 0,
+                'needSaveInfo'  => strpos($prize->p_name, '跑鞋') ? 1 : 0,
+                'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+                'number'        => ''
+            ];
+            Shop::whereIn('s_id', $prize->p_apply_shop)
+                ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+                ->get()
+                ->map(function ($item) use (&$data) {
+                    $data['shops'][] = $item->s_name;
+                });
+			return $this->responseSuccess(['pointIsNotEnough' => 0, 'data' => $data]);
         } catch (\Exception $e) {
             DB::rollback();
             return $this->responseFail($e->getMessage());
@@ -560,18 +652,29 @@ class ApiController extends Controller
         $page = $request->input('page', 1);
         $pageSize = $request->input('pageSize', 10);
 
+        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '兑换'])
-            ->select(DB::raw('p_name as name, p_img as img, p_point as point, p_apply_city as applyCity, p_apply_shop as applyShop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code'))
+            ->select(DB::raw('p_name as name, p_img as img, p_point as point, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
             ->get()
-            ->map(function ($item, $key) use (&$data) {
+            ->map(function ($item, $key) use (&$data, $shops) {
                 $data[$key] = $item;
-                $data[$key]['needSaveInfo'] = strpos($item->name, '跑鞋') ? 1 : 0;
+                $data[$key]['needSaveInfo'] = strpos($item->name, '鞋') ? 1 : 0;
                 $data[$key]['isCoupon'] = strpos($item->name, '优惠券') ? 1 : 0;
+                $applyShopIds = explode('-', $item->p_apply_shop);
+                $data[$key]['applyShop'] = $applyShopIds;
+
+                $tempShops = [];
+                foreach ($shops as $shop) {
+                    if (in_array($shop->s_id, $applyShopIds)) {
+                        $tempShops[] = $shop->s_name;
+                    }
+                }
+                $data[$key]['shops'] = $tempShops;
             });
 
         return $this->responseSuccess($data);

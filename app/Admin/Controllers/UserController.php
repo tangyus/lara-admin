@@ -6,6 +6,7 @@ use App\Admin\Extensions\PointRecordExporter;
 use App\Admin\Extensions\UserExporter;
 use App\model\Account;
 use App\Model\PointRecord;
+use App\model\Prize;
 use App\Model\User;
 use App\Http\Controllers\Controller;
 use App\Model\UserPrize;
@@ -15,6 +16,7 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
+use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
@@ -145,7 +147,7 @@ class UserController extends Controller
         $grid->u_current_point('当前积分');
         $grid->u_total_point('总积分');
         $grid->u_ip('登录IP');
-        $grid->u_created('登录时间')->sortable();
+        $grid->u_created('登录时间');
 
         $grid->disableCreateButton();
         $grid->disableRowSelector();
@@ -154,9 +156,11 @@ class UserController extends Controller
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
 
-            $filter->column(1 / 2, function ($filter) {
-                $filter->equal('u_account_id', '区域')->select('/admin/accounts_list');
-            });
+            if (!Admin::user()->isRole('市场人员')) {
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('u_account_id', '区域')->select('/admin/accounts_list');
+                });
+            }
             $filter->column(1 / 2, function ($filter) {
                 $filter->equal('u_phone', '手机号');
             });
@@ -216,7 +220,8 @@ class UserController extends Controller
     {
         $grid = new Grid(new PointRecord());
         $grid->exporter(new PointRecordExporter());
-        $grid->model()->leftJoin('users', 'u_id', 'pr_uid')
+        $grid->model()->where('pr_received', 1)
+            ->leftJoin('users', 'u_id', 'pr_uid')
 			->leftJoin('accounts', 'a_id', 'u_account_id')
 			->where(function ($query) {
 				if (Admin::user()->isRole('市场人员')) {
@@ -228,11 +233,9 @@ class UserController extends Controller
 			->orderBy('pr_updated', 'desc');
 
         $grid->pr_id('ID');
-        $grid->a_district('区域');
-        $grid->u_city('城市');
-        $grid->u_nick('用户昵称');
-        $grid->u_headimg('用户头像')->image('', 64, 64);
-        $grid->u_phone('用户手机号');
+        $grid->u_headimg('用户头像')->image('', 64, 64)->expand(function () {
+            return new Table(['区域', '城市', '昵称', '手机号'], [0 => [$this->a_district, $this->u_city, $this->u_nick, $this->u_phone]]);
+        });
         $grid->pr_prize_type('礼品类型');
         $grid->pr_prize_name('礼品名称');
         $grid->pr_point('积分')->display(function ($point) {
@@ -255,17 +258,18 @@ class UserController extends Controller
                         $query->where('u_phone', $this->input);
                     });
                 }, '用户手机号');
-                $filter->where(function ($query) {
-                    $query->whereHas('user', function ($query) {
-                        $query->where('u_account_id', $this->input);
-                    });
-                }, '用户区域')->select('/admin/accounts_list');
+                if (!Admin::user()->isRole('市场人员')) {
+                    $filter->where(function ($query) {
+                        $query->whereHas('user', function ($query) {
+                            $query->where('u_account_id', $this->input);
+                        });
+                    }, '用户区域')->select('/admin/accounts_list');
+                }
 
-                $filter->between('pr_created', '获取/消耗时间')->datetime();
+                $filter->between('pr_created', '时间')->datetime();
             });
             $filter->column(1 / 2, function ($filter) {
-                $filter->like('p_prize_type', '礼品类型');
-                $filter->equal('pr_shop_id', '使用门店')->select('/admin/shops_list');
+                $filter->equal('pr_prize_type', '礼品类型')->select((new Prize())->prizeType);
             });
         });
 
@@ -337,16 +341,15 @@ class UserController extends Controller
             ->orderBy('up_created', 'desc');
 
         $grid->up_id('ID');
-        $grid->up_type('中奖类型');
-        $grid->u_city('城市');
-        $grid->u_nick('用户昵称');
-        $grid->u_headimg('用户头像')->image('', 64, 64);
-        $grid->u_phone('用户手机号');
+        $grid->u_headimg('用户头像')->image('', 64, 64)->expand(function () {
+            return new Table(['城市', '昵称', '手机号'], [0 => [$this->u_city, $this->u_nick, $this->u_phone]]);
+        });
+        $grid->up_type('类型');
         $grid->p_name('奖品名称');
         $grid->p_type('奖品类型');
         $grid->up_received('是否领取')->using(['否', '是']);
         $grid->up_code('券码');
-        $grid->s_name('核销门店')->expand(function ($model) {
+        $grid->s_name('核销门店')->modal('核销门店', function ($model) {
             return new Table(['所在城市', '门店编号', '门店名称', '负责人', '负责人电话', '门店地址'], [0 => [
                 $model->s_city,
                 $model->s_number,
@@ -356,6 +359,7 @@ class UserController extends Controller
                 $model->s_address
             ]]);
         });
+        $grid->up_number('快递单号')->editable();
         $grid->up_created('时间');
 
         $grid->disableCreateButton();
@@ -364,14 +368,19 @@ class UserController extends Controller
 
         // 数据查询过滤
         $grid->disableFilter();
-
-        // 禁用 编辑和删除
-        $grid->actions(function ($actions) {
-            $actions->disableDelete();
-            $actions->disableEdit();
-            $actions->disableView();
-        });
+        $grid->disableActions();
 
         return $grid;
+    }
+
+    /**
+     * 更新快递单号
+     * @param $id
+     * @param Request $request
+     */
+    public function updateUserPrize($id, Request $request)
+    {
+        $input = $request->input();
+        UserPrize::where('up_id', $id)->update([$input['name'] => $input['value']]);
     }
 }

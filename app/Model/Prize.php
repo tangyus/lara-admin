@@ -29,4 +29,23 @@ class Prize extends Model
     {
         return $this->belongsTo(Account::class, 'p_account_id');
     }
+
+    public function getPApplyShopAttribute($shops)
+    {
+        if (is_string($shops)) {
+            return array_filter(explode('-', $shops));
+        }
+
+        return $shops;
+    }
+    
+    public function setPApplyShopAttribute($value)
+    {
+        $this->attributes['p_apply_shop'] = implode('-', $value);
+    }
+
+    public function shops()
+    {
+        return $this->belongsToMany(Shop::class, 'prize_shops', 'shop_id', 'prize_id');
+    }
 }

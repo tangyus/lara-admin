@@ -6,6 +6,7 @@ use App\Admin\Extensions\PrizeExporter;
 use App\model\Account;
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
+use App\model\Shop;
 use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
 use Encore\Admin\Facades\Admin;
@@ -14,7 +15,6 @@ use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
-use Illuminate\Support\Facades\Auth;
 
 class PrizeController extends Controller
 {
@@ -139,28 +139,28 @@ class PrizeController extends Controller
                     $filter->like('p_name', '礼品名称');
                 });
                 $filter->column(1 / 2, function ($filter) {
-                    $filter->equal('p_type', '礼品类型')->radio((new Prize())->prizeType)->stacked();
+                    $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
                 });
             });
         } else {
             $grid->disableFilter();
         }
         $grid->p_type('礼品类型')->using((new Prize())->prizeType);
-        $grid->p_name('礼品名称');
+        $grid->p_name('礼品详情')->modal('详情', function () {
+            return new Table(['领取规则', '领取截止时间', '活动热线'], [0 => [$this->p_rule, $this->p_deadline, $this->p_phone_number]]);
+        });
+        $grid->p_apply_city('城市')->modal('适用门店', function () {
+            $shops = Shop::find($this->p_apply_shop)->map(function ($item) {
+                return $item->only('s_name', 's_city');
+            });
+
+            return new Table(['门店名称', '门店城市'], $shops->toArray());
+        });
         $grid->p_point('兑换所需积分')->display(function () {
 			return (is_null($this->p_point) || $this->p_point == 0) ? '-' : $this->p_point;
 		});
         $grid->p_rate('中奖概率')->display(function () {
 			return is_null($this->p_rate) ? '-' : $this->p_rate . '%';
-		});
-        $grid->p_detail('礼品详情')->expand(function ($model) {
-			return new Table(['适用城市', '适用门店', '领取规则', '领取截止时间', '活动热线'], [0 => [
-				$model->p_apply_city,
-				$model->p_apply_shop,
-				$model->p_rule,
-				$model->p_deadline,
-				$model->p_phone_number,
-			]]);
 		});
         $grid->p_number('礼品数量');
         $grid->p_current_number('剩余数量(总量-已核销)')->display(function () {
@@ -176,7 +176,6 @@ class PrizeController extends Controller
             $grid->p_state('是否停用')->switch($this->states);
         }
         $grid->p_img('礼品图')->image('', 100, 100);
-//        $grid->p_thumb('礼品缩略图')->image('', 100, 100);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
 
@@ -220,7 +219,6 @@ class PrizeController extends Controller
             return is_null($rate) ? '-' : $rate . '%';
         });
         $show->p_img('礼品图')->image();
-//        $show->p_thumb('礼品缩略图')->image();
         $show->p_created('创建时间');
         $show->p_updated('修改时间');
 
@@ -253,6 +251,7 @@ class PrizeController extends Controller
 
                 $form->saving(function (Form $form) use ($account) {
                     $form->input('p_account_id', $account->a_id);
+                    $form->input('p_apply_city', $account->a_city);
                 });
             } else {
                 $form->select('p_account_id', '区域')->options('/admin/accounts_list');
@@ -264,14 +263,22 @@ class PrizeController extends Controller
         $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
         $form->text('p_point', '兑换所需积分')->default(0)->disable();
         $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->disable();
-        $form->multipleSelect('p_apply_city', '适用城市')->options('/admin/shops_list');
-        $form->text('p_apply_shop', '适用门店');
-        $form->text('p_rule', '领取规则');
-        $form->datetime('p_deadline', '领取截止时间');
-        $form->text('p_phone_number', '活动热线');
+        if (!empty($account)) {
+            $form->text('p_apply_city', '适用城市')->default($account->a_city)->disable();
+        } else {
+            $form->text('p_apply_city', '适用城市');
+        }
+        $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
+            if (Admin::user()->isRole('市场人员')) {
+                $account = Account::where('a_account', Admin::user()->username)->first();
+                $query->where('s_account_id', $account->a_id);
+            }
+        })->get()->pluck('s_name', 's_id'));
+        $form->text('p_rule', '领取规则')->rules('required', ['required' => '请输入领取规则']);
+        $form->datetime('p_deadline', '领取截止时间')->rules('required', ['required' => '请输入领取截止时间']);
+        $form->text('p_phone_number', '活动热线')->rules('required', ['required' => '请输入活动热线']);
 
-        $form->image('p_img', '礼品图')->move('prizes')->rules('required', ['required' => '请上传礼品图']);
-//        $form->image('p_thumb', '礼品缩略图')->move('prizes')->rules('required', ['required' => '请上传礼品缩略图']);
+        $form->image('p_img', '礼品图')->move('prizes');
         $form->switch('p_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {

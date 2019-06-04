@@ -86,8 +86,8 @@ class QrcodeController extends Controller
             $grid->district()->a_manager('区域负责人姓名');
             $grid->district()->a_manager_phone('区域负责人电话');
         }
-        $grid->q_city('生成城市');
-        $grid->q_number('生成数量');
+        $grid->q_city('城市');
+        $grid->q_number('数量');
         $grid->q_point('扫码积分');
         $grid->q_member_date('会员日')->using($this->memberDate);
         $grid->q_expired('二维码扫描截止日期');
@@ -126,19 +126,21 @@ class QrcodeController extends Controller
 
         if (Admin::user()->isRole('市场人员')) {
             $form->hidden('q_account_id');
+            $form->hidden('q_city');
             $account = Account::where('a_account', Admin::user()->username)->first();
             $form->saving(function ($form) use ($account) {
                 $form->input('q_account_id', $account->a_id);
+                $form->input('q_city', $account->a_city);
             });
 
-            $form->text('q_district', '区域')->default($account->a_district)->attribute(['disabled' => true]);
+            $form->text('q_district', '区域')->default($account->a_district)->disable();
+            $form->text('q_city', '城市')->default($account->a_city)->disable();
         } else {
             $form->select('q_account_id', '区域')->options('/admin/accounts_list')->rules('required', ['required' => '请选择区域']);
+            $form->text('q_city', '城市')->rules('required', ['required' => '请输入城市']);
         }
-
-        $form->text('q_city', '城市')->rules('required', ['required' => '请输入城市']);
         $form->text('q_number', '生成数量')->rules('required', ['required' => '请输入生成数量']);
-        $form->datetime('q_expired', '二维码扫描截止日期')->setWidth(6, 2)->rules('required', ['required' => '请选择二维码扫描截止日期']);
+        $form->datetime('q_expired', '二维码扫描截止日期')->placeholder('输入扫描截止日期')->rules('required', ['required' => '请选择二维码扫描截止日期']);
         $form->radio('q_member_date', '会员日')->options($this->memberDate);
         $form->number('q_point', '扫码积分')->min(5)->default(5);
 
@@ -175,7 +177,7 @@ class QrcodeController extends Controller
                     }
                 }
                 $zip->close(); // 关闭处理的zip文件
-                Code::whereIn('c_id', $ids)->limit($model->q_number)->update(['c_qrcode_id' => $model->q_id]);
+                Code::whereIn('c_id', $ids)->update(['c_qrcode_id' => $model->q_id]);
 
                 $model->q_zip_path = "/download/codes/{$model->q_id}.zip";
                 $model->save();

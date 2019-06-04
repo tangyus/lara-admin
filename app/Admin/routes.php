@@ -37,6 +37,7 @@ Route::group([
     $router->get('users/point_record', 'UserController@pointRecord');
     $router->get('users/point_record/{id}', 'UserController@pointRecordShow');
     $router->get('users/prize', 'UserController@userPrize');
+    $router->put('users/prize/{id}', 'UserController@updateUserPrize');
     $router->resource('users', UserController::class, ['only' => ['index', 'show']]);
 
     // 数据管理

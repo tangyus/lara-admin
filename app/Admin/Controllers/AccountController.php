@@ -7,11 +7,13 @@ use App\model\Account;
 use Carbon\Carbon;
 use Encore\Admin\Auth\Permission;
 use Encore\Admin\Controllers\HasResourceActions;
+use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class AccountController
@@ -171,7 +173,11 @@ class AccountController
         $show->a_manager_phone('区域联系电话');
         $show->a_account('账号');
         $show->a_password('密码');
+        $show->a_hot_line('工作热线');
+        $show->a_work_time('工作时间');
+        $show->a_sponsor('主办方');
         $show->a_scan_times('每个ID单日扫码最高次数');
+        $show->a_lottery_times('每个ID单日抽奖最高次数');
         $show->a_state('是否停用')->using([1 => '是', 0 => '否']);
         $show->a_created('创建时间');
         $show->a_updated('更新时间');
@@ -201,7 +207,11 @@ class AccountController
         $grid->a_manager_phone('区域联系电话');
         $grid->a_account('账号');
         $grid->a_password('密码');
+        $grid->a_hot_line('工作热线');
+        $grid->a_work_time('工作时间');
+        $grid->a_sponsor('主办方');
         $grid->a_scan_times('每个ID单日扫码最高次数');
+        $grid->a_lottery_times('每个ID单日抽奖最高次数');
         $grid->a_state('是否停用')->switch($this->states);
         $grid->a_created('创建时间');
         $grid->a_updated('更新时间');
@@ -262,8 +272,12 @@ class AccountController
             'required'  => '请输入区域联系电话',
             'regex'     => '电话号码非法'
         ]);
-        $form->password('a_password', '密码')->rules('required', ['required' => '请输入密码']);
+        $form->text('a_password', '密码')->rules('required', ['required' => '请输入密码']);
+        $form->text('a_hot_line', '工作热线')->rules('required', ['required' => '请输入工作热线']);
+        $form->text('a_work_time', '工作时间')->rules('required', ['required' => '请输入工作时间']);
+        $form->text('a_sponsor', '主办方')->rules('required', ['required' => '请输入主办方']);
         $form->number('a_scan_times', '每个ID单日扫码最高次数')->default(0)->min(0);
+        $form->number('a_lottery_times', '每个ID单日抽奖最高次数')->default(0)->min(0);
         $form->switch('a_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {
