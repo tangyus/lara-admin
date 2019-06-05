@@ -131,6 +131,7 @@ class QrcodeController extends Controller
             $form->saving(function ($form) use ($account) {
                 $form->input('q_account_id', $account->a_id);
                 $form->input('q_city', $account->a_city);
+                $form->input('q_expired', '2019-09-15 23:59:59');
             });
 
             $form->text('q_district', '区域')->default($account->a_district)->disable();
@@ -140,7 +141,7 @@ class QrcodeController extends Controller
             $form->text('q_city', '城市')->rules('required', ['required' => '请输入城市']);
         }
         $form->text('q_number', '生成数量')->rules('required', ['required' => '请输入生成数量']);
-        $form->datetime('q_expired', '二维码扫描截止日期')->placeholder('输入扫描截止日期')->rules('required', ['required' => '请选择二维码扫描截止日期']);
+        $form->datetime('q_expired', '二维码扫描截止日期')->placeholder('二维码扫描截止日期')->value('2019-09-15 23:59:59')->disable();
         $form->radio('q_member_date', '会员日')->options($this->memberDate);
         $form->number('q_point', '扫码积分')->min(5)->default(5);
 
@@ -164,22 +165,23 @@ class QrcodeController extends Controller
         if (count($codes) > 0) {
             $publicPath = public_path();
             $path = $publicPath . '/download/codes';
-            $zipPath = $path . "/{$model->q_id}.zip";
+            $time = time();
+            $zipPath = $path . "/{$time}_{$model->q_id}.zip";
             $ids = [];
 
             $zip = new \ZipArchive();
             if ($zip->open($zipPath, \ZipArchive::CREATE) === TRUE) {
                 foreach ($codes as $codeFile) {
-                    if (file_exists($publicPath . $codeFile->c_path)) {
+//                    if (file_exists($publicPath . $codeFile->c_path)) {
                         // 将文件加入zip对象
                         $ids[] = $codeFile['c_id'];
                         $zip->addFile($publicPath . '/' . $codeFile->c_path, $codeFile->c_filename);
-                    }
+//                    }
                 }
                 $zip->close(); // 关闭处理的zip文件
                 Code::whereIn('c_id', $ids)->update(['c_qrcode_id' => $model->q_id]);
 
-                $model->q_zip_path = "/download/codes/{$model->q_id}.zip";
+                $model->q_zip_path = "/download/codes/{$time}_{$model->q_id}.zip";
                 $model->save();
             }
         }

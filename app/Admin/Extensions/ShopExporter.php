@@ -19,8 +19,6 @@ class ShopExporter extends ExcelExporter implements WithStrictNullComparison
     protected $columns = [
         's_number'          => '门店序号',
         's_name'            => '门店名称',
-        's_target'          => '销售目标',
-        's_sales'           => '实际销量',
         's_manager'         => '门店负责人姓名',
         's_manager_phone'   => '门店负责人电话',
         's_state'           => '是否停用(0/否、1/是)',

@@ -61,7 +61,10 @@ class ActController extends Controller
         $grid->disableCreateButton();
         $grid->disableRowSelector();
         $grid->disableActions();
-        $grid->disableFilter();
+        $grid->filter(function ($filter){
+            $filter->disableIdFilter();
+            $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+        });
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
         });

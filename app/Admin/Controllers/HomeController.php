@@ -18,6 +18,10 @@ use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
+    /**
+     * 生成二维码券码 code
+     * @return int|string
+     */
     public function createCodes()
     {
         try {
@@ -45,7 +49,20 @@ class HomeController extends Controller
      */
     public function wxCode()
     {
-        $app = Factory::miniProgram(config('miniprogram'));
+        $config = [
+            'app_id' => 'wx82de84528e164c9b',
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47',
+
+            // 下面为可选项
+            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
+            'response_type' => 'array',
+
+            'log' => [
+                'level' => 'debug',
+                'file' => public_path().'/wechat.log',
+            ],
+        ];
+        $app = Factory::miniProgram($config);
         $codes = Code::whereNull('c_path')->limit(10)->get();
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [

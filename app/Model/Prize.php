@@ -12,7 +12,7 @@ class Prize extends Model
     const NEW_PRIZE = '闪电新人礼';
     const ADVANCE_PRIZE = '闪电进阶礼';
     const LEGEND_PRIZE = '闪电传奇礼';
-    const EXCHANGE_PRIZE = '闪电兑换礼';
+    const EXCHANGE_PRIZE = '闪电积分礼';
     const MEMBER_PRIZE = '闪电会员礼';
 
     protected $primaryKey = 'p_id';

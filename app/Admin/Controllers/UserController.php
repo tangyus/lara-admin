@@ -345,9 +345,20 @@ class UserController extends Controller
             return new Table(['城市', '昵称', '手机号'], [0 => [$this->u_city, $this->u_nick, $this->u_phone]]);
         });
         $grid->up_type('类型');
-        $grid->p_name('奖品名称');
+        $grid->p_name('奖品名称')->modal('邮寄信息', function ($model) {
+            return new Table(['姓名', '电话', '地址', '尺码', '身份证号', '快递单号'], [0 => [
+                $model->up_name,
+                $model->up_phone,
+                $model->up_address,
+                $model->up_size,
+                $model->up_idcard,
+                $model->up_number
+            ]]);
+        });
         $grid->p_type('奖品类型');
-        $grid->up_received('是否领取')->using(['否', '是']);
+        $grid->up_received('是否领取')->display(function ($received) {
+            return ($received == 1) ? "<span class='label label-success'>是</span>" : "<span class='label label-info'>否</span>";
+        });
         $grid->up_code('券码');
         $grid->s_name('核销门店')->modal('核销门店', function ($model) {
             return new Table(['所在城市', '门店编号', '门店名称', '负责人', '负责人电话', '门店地址'], [0 => [
@@ -367,7 +378,10 @@ class UserController extends Controller
         $grid->disableExport();
 
         // 数据查询过滤
-        $grid->disableFilter();
+        $grid->filter(function ($filter) {
+            $filter->disableIdFilter();
+            $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+        });
         $grid->disableActions();
 
         return $grid;

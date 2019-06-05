@@ -138,7 +138,7 @@ class AccountController
      */
     public function accountsList()
     {
-        $accounts = DB::select('select `a_id` as `id`, `a_district` as `text` from `g_4357_accounts` group by `text` ORDER BY `id`');
+        $accounts = DB::select("select `a_id` as `id`, concat(`a_district`, '-', `a_city`) as `text` from `g_4357_accounts` ORDER BY `id`");
 
         return $accounts ? $accounts : $this->districts;
     }

@@ -131,25 +131,12 @@ class PrizeController extends Controller
                 });
                 return new Table(['区域', '城市', '区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
-            $grid->filter(function ($filter) {
-                $filter->disableIdFilter();
-
-                $filter->column(1 / 2, function ($filter) {
-                    $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
-                    $filter->like('p_name', '礼品名称');
-                });
-                $filter->column(1 / 2, function ($filter) {
-                    $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
-                });
-            });
-        } else {
-            $grid->disableFilter();
         }
         $grid->p_type('礼品类型')->using((new Prize())->prizeType);
         $grid->p_name('礼品详情')->modal('详情', function () {
             return new Table(['领取规则', '领取截止时间', '活动热线'], [0 => [$this->p_rule, $this->p_deadline, $this->p_phone_number]]);
         });
-        $grid->p_apply_city('城市')->modal('适用门店', function () {
+        $grid->p_apply_city('适用门店')->modal('适用门店', function () {
             $shops = Shop::find($this->p_apply_shop)->map(function ($item) {
                 return $item->only('s_name', 's_city');
             });
@@ -168,16 +155,26 @@ class PrizeController extends Controller
 		});
         if (Admin::user()->cannot('prizes.create')) {
             $grid->p_state('是否停用')->using(['否', '是']);
-            $grid->disableCreateButton();
-            $grid->actions(function ($actions) {
-                $actions->disableDelete();
-            });
         } else {
             $grid->p_state('是否停用')->switch($this->states);
         }
         $grid->p_img('礼品图')->image('', 100, 100);
         $grid->p_created('创建时间');
         $grid->p_updated('修改时间');
+
+        $grid->filter(function ($filter) {
+            $filter->disableIdFilter();
+
+            $filter->column(1 / 2, function ($filter) {
+                if (!Admin::user()->isRole('市场人员')) {
+                    $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
+                }
+                $filter->like('p_name', '礼品名称');
+            });
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+            });
+        });
 
         $grid->disableRowSelector();
         if (Admin::user()->cannot('prizes.create')) {
@@ -241,44 +238,61 @@ class PrizeController extends Controller
     {
         $form = new Form(new Prize);
 
+        $prize = null;
         if ($id) {
-            $form->text('district.a_district', '区域')->disable();
-        } else {
-            if (Admin::user()->isRole('市场人员')) {
-                $account = Account::where('a_account', Admin::user()->username)->first();
-                $form->text('a_district', '区域')->default($account->a_district)->disable();
-                $form->hidden('p_account_id');
+            $prize = Prize::find($id);
+        }
+        if (Admin::user()->isRole('市场人员')) {
+            $account = Account::where('a_account', Admin::user()->username)->first();
+            $form->text('a_district', '区域')->default($account->a_district)->disable();
+            $form->text('a_district', '适用城市')->default($account->a_city)->disable();
+            $form->hidden('p_account_id');
+            $form->hidden('p_apply_city');
 
-                $form->saving(function (Form $form) use ($account) {
-                    $form->input('p_account_id', $account->a_id);
-                    $form->input('p_apply_city', $account->a_city);
-                });
-            } else {
-                $form->select('p_account_id', '区域')->options('/admin/accounts_list');
+            $form->saving(function (Form $form) use ($account) {
+                $form->input('p_account_id', $account->a_id);
+                $form->input('p_apply_city', $account->a_city);
+                if (in_array($form->input('p_type'), [Prize::NEW_PRIZE, Prize::ADVANCE_PRIZE])) {
+                    $form->input('p_deadline', '2019-09-15 23:59:59');
+                }
+//                dd($form->p_apply_shop);
+//                dd($form->input('p_apply_city'));
+            });
+        }
+        if ($prize) {
+            if ($prize->p_type == Prize::LEGEND_PRIZE) {
+                $form->text('p_name', '礼品名称')->disable();
+                $form->text('p_type', '礼品类型')->disable();
+                $form->text('p_number', '礼品数量')->disable();
+                $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->default(null)->disable();
+            } elseif ($prize->p_type == Prize::EXCHANGE_PRIZE) {
+                $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
+                $form->text('p_point', '兑换所需积分')->default(null)->disable();
             }
         }
-
-        $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
-        $form->radio('p_type', '礼品类型')->options((new Prize())->prizeType)->rules('required', ['required' => '请选择礼品类型']);
-        $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
-        $form->text('p_point', '兑换所需积分')->default(0)->disable();
-        $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->disable();
-        if (!empty($account)) {
-            $form->text('p_apply_city', '适用城市')->default($account->a_city)->disable();
-        } else {
-            $form->text('p_apply_city', '适用城市');
+        if (!$prize || !in_array($prize->p_type, [Prize::EXCHANGE_PRIZE, Prize::LEGEND_PRIZE])) {
+            $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
+            $form->radio('p_type', '礼品类型')->options([
+                Prize::NEW_PRIZE => Prize::NEW_PRIZE,
+                Prize::ADVANCE_PRIZE => Prize::ADVANCE_PRIZE,
+                Prize::MEMBER_PRIZE => Prize::MEMBER_PRIZE,
+            ])->rules('required', ['required' => '请选择礼品类型']);
+            $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
         }
-        $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
-            if (Admin::user()->isRole('市场人员')) {
-                $account = Account::where('a_account', Admin::user()->username)->first();
-                $query->where('s_account_id', $account->a_id);
-            }
-        })->get()->pluck('s_name', 's_id'));
-        $form->text('p_rule', '领取规则')->rules('required', ['required' => '请输入领取规则']);
-        $form->datetime('p_deadline', '领取截止时间')->rules('required', ['required' => '请输入领取截止时间']);
-        $form->text('p_phone_number', '活动热线')->rules('required', ['required' => '请输入活动热线']);
+        $form->datetime('p_deadline', '领取截止时间')->placeholder('领取截止时间')->disable();
 
-        $form->image('p_img', '礼品图')->move('prizes');
+        if ($prize && in_array($prize->p_type, [Prize::EXCHANGE_PRIZE, Prize::LEGEND_PRIZE]) && !strpos($prize->p_name, '优惠券')) {
+            $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
+                if (Admin::user()->isRole('市场人员')) {
+                    $account = Account::where('a_account', Admin::user()->username)->first();
+                    $query->where('s_account_id', $account->a_id);
+                    $query->where('s_state', 0);
+                }
+            })->get()->pluck('s_name', 's_id'));
+            $form->text('p_phone_number', '活动热线');
+            $form->text('p_rule', '领取规则');
+            $form->image('p_img', '礼品图')->uniqueName()->move('prizes')->disable();
+        }
         $form->switch('p_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {
@@ -287,22 +301,29 @@ class PrizeController extends Controller
 
         $form->html("
             <script type='text/javascript'>
-                    $(function() {
-                        $('.radio-inline').click(function() {
-                            var a= $('.iradio_minimal-blue.hover')[0];
-                            var val = $($(a).children()[0]).val();
-                            if (val == '闪电传奇礼') {
-                                $('#p_rate').attr('disabled', false);
-                                $('#p_point').attr('disabled', true);
-                            } else if (val == '闪电兑换礼') {
-                                $('#p_point').attr('disabled', false);
-                                $('#p_rate').attr('disabled', true);
+                $(function() {
+                    $('.radio-inline').click(function() {
+                        var a= $('.iradio_minimal-blue.hover')[0];
+                        var val = $($(a).children()[0]).val();
+                        if (val == '闪电传奇礼') {
+                            $('#p_deadline').val('2019-09-30 23:59:59');
+//                            $('#p_rate').attr('disabled', false);
+//                            $('#p_point').attr('disabled', true);
+                        } else if (val == '闪电积分礼') {
+                            $('#p_deadline').val('2019-09-30 23:59:59');
+//                            $('#p_point').attr('disabled', false);
+//                            $('#p_rate').attr('disabled', true);
+                        } else {
+                            if (val == '闪电新人礼' || val == '闪电进阶礼') {
+                                $('#p_deadline').val('2019-09-15 23:59:59');
                             } else {
-                                 $('#p_point').attr('disabled', true);
-                                $('#p_rate').attr('disabled', true);
+                                $('#p_deadline').val('');
                             }
-                        })
+                            $('#p_point').attr('disabled', true);
+                            $('#p_rate').attr('disabled', true);
+                        }
                     })
+                })
             </script>
         ");
 

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Exports\UserPrizeExport;
 use App\Http\Controllers\Controller;
 use App\model\Prize;
 use App\model\Shop;
 use App\Model\UserPrize;
 use EasyWeChat\Factory;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class IndexController extends Controller
 {
@@ -27,7 +29,7 @@ class IndexController extends Controller
     {
         $this->checkLogin();
 
-        if ($this->shop && $this->shop->s_expired > time()) {
+        if ($this->shop) {
             return $this->responseSuccess([
                 'token'         => $this->shop->s_token,
                 'name'          => $this->shop->s_name,
@@ -59,9 +61,11 @@ class IndexController extends Controller
             return $this->responseFail('密码不正确');
         }
 
-        $shop->s_token = sha1(time() . uniqid());
-        $shop->s_expired = time() + 7000;
-        $shop->save();
+        if (empty($shop->s_token)) {
+            $shop->s_token = sha1(time() . uniqid());
+            $shop->s_expired = time() + 7000;
+            $shop->save();
+        }
 
         return $this->responseSuccess([
             'token'         => $shop->s_token,
@@ -83,21 +87,28 @@ class IndexController extends Controller
     {
         $this->checkLogin();
         if (!$this->shop) {
-            return $this->responseFail('请先登录，再进行操作!');
+            return $this->responseLogin();
         }
 
-        $prizeCode = $request->input('code');
-        $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode, 'up_received' => 0])->first();
-        if (!$userPrize) {
-            return $this->responseFail('该奖品已核销或券码无效');
-        }
+        try {
+            $prizeCode = $request->input('code');
+            $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode, 'up_received' => 0])->first();
+            if (!$userPrize) {
+                return $this->responseFail('该奖品已核销或券码无效');
+            }
+            if ($userPrize->prize->p_account_id != $this->shop->s_account_id) {
+                return $this->responseFail('该奖品不属于本区域核销');
+            }
 
-        return $this->responseSuccess([
-            'id'            => $userPrize->up_id,
-            'nickName'      => !empty($userPrize->user->nick) ? $userPrize->user->u_nick : '测试',
-            'prizeName'     => $userPrize->prize->p_name,
-            'prizeThumb'    => $userPrize->prize->p_thumb
-        ]);
+            return $this->responseSuccess([
+                'id'            => $userPrize->up_id,
+                'nickName'      => !empty($userPrize->user->u_nick) ? $userPrize->user->u_nick : '',
+                'prizeName'     => $userPrize->prize->p_name,
+                'prizeThumb'    => $userPrize->prize->p_img
+            ]);
+        } catch (\Exception $e) {
+            return $this->responseFail($e->getMessage());
+        }
     }
 
     /**
@@ -109,7 +120,7 @@ class IndexController extends Controller
     {
         $this->checkLogin();
         if (!$this->shop) {
-            return $this->responseFail('请先登录，再进行操作!');
+            return $this->responseLogin();
         }
 
         $id = $request->input('id');
@@ -141,7 +152,7 @@ class IndexController extends Controller
     {
         $this->checkLogin();
         if (!$this->shop) {
-            return $this->responseFail('请先登录，再进行操作!');
+            return $this->responseLogin();
         }
 
         $data = [];
@@ -150,7 +161,7 @@ class IndexController extends Controller
             ->get()
             ->map(function ($item) use (&$data) {
                 $data[] = [
-                    'nick'      => !empty($item->user->nick) ? $item->user->u_nick : '测试',
+                    'nick'      => !empty($item->user->u_nick) ? $item->user->u_nick : '',
                     'phone'     => $item->user ? $item->user->u_phone : '',
                     'prizeType' => $item->prize->p_type,
                     'prizeName' => $item->prize->p_name,
@@ -187,5 +198,17 @@ class IndexController extends Controller
         $response = $app->jssdk->buildConfig($jssdkApi, false, false, true);
 
         return $response;
+    }
+
+    /**
+     * 导出excel
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function export(Request $request)
+    {
+        $sId = $request->get('sid', '');
+        $shop = Shop::where('s_token', $sId)->first();
+        return Excel::download(new UserPrizeExport($shop ? $shop->s_id : 0), '核销记录.xlsx');
     }
 }

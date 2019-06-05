@@ -12,10 +12,6 @@ Route::group([
     $router->get('/', function () {
         return redirect('/admin/users');
     });
-
-    $router->get('create_codes', 'HomeController@createCodes');
-    $router->get('wx_codes', 'HomeController@wxCode');
-
     // 二维码管理
     $router->get('qrcodes/download', 'QrcodeController@download');
     $router->resource('qrcodes', QrcodeController::class, ['only' => ['index', 'create', 'store']]);

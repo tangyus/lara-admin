@@ -11,12 +11,15 @@
 |
 */
 
+$router->get('create_codes', 'Controller@createCodes');
+$router->get('wx_codes', 'Controller@wxCode');
+
 Route::group([
 	'prefix'    => 'api',
 	'namespace' => 'Api',
 	'middleware' => ['api']
 ], function (\Illuminate\Routing\Router $router) {
-	$router->get('auth', 'AuthController@auth');
+	$router->post('auth', 'AuthController@auth');
 	$router->post('user_info', 'AuthController@decryptUserInfo');
 
 	$router->group(['middleware' => 'miniprogram.auth'], function ($router) {
@@ -24,6 +27,8 @@ Route::group([
 		$router->post('info', 'ApiController@info');
 		$router->post('point_record', 'ApiController@pointRecord');
 		$router->post('point_receive', 'ApiController@pointReceive');
+
+        $router->post('sign_date', 'ApiController@signDate');
 
 		// 抽奖
 		$router->post('lottery_prize', 'ApiController@lotteryPrizes');
@@ -50,4 +55,5 @@ Route::group([
     $router->post('prize_info', 'IndexController@prizeInfo');
     $router->post('verify_prize', 'IndexController@verifyPrize');
     $router->post('verify_record', 'IndexController@verifyRecord');
+    $router->get('export', 'IndexController@export');
 });

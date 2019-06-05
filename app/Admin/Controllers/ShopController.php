@@ -118,6 +118,7 @@ class ShopController extends Controller
                     $account = Account::where('a_account', Admin::user()->username)->first();
                     $query->where('s_account_id', $account->a_id);
                 }
+                $query->where('s_state', 0);
             })
             ->get(['s_id as id', 's_name as text']);
     }
@@ -162,7 +163,7 @@ class ShopController extends Controller
                         $query->whereHas('district', function ($query) {
                             $query->where('a_manager_phone', $this->input);
                         });
-                    }, '区域联系电话');
+                    }, '区域负责人联系电话');
                 });
                 $filter->column(1 / 2, function ($filter) {
                     $filter->equal('s_number', '门店序号');
@@ -266,13 +267,14 @@ class ShopController extends Controller
                 $account = Account::where('a_account', Admin::user()->username)->first();
                 $form->text('s_district', '区域')->default($account->a_district)->disable();
                 $shopCount = Shop::where('s_account_id', $account->a_id)->count();
+
+                $number = pinyin($account->a_district).'-'.pinyin($account->a_city).str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
+                $form->text('s_city', '城市')->default($account->a_city)->disable();
+                $form->text('s_number', '门店序号')->default($number)->disable();
+
                 $form->hidden('s_account_id');
                 $form->hidden('s_city');
                 $form->hidden('s_number');
-
-                $number = pinyin($account->a_district) . str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
-                $form->text('s_city', '城市')->default($account->a_city)->disable();
-                $form->text('s_number', '门店序号')->default($number)->disable();
 
                 $form->saving(function (Form $form) use ($account, $number) {
                     $form->input('s_account_id', $account->a_id);
