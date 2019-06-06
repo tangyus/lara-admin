@@ -55,7 +55,13 @@ class AuthController extends Controller
                     'u_expired'         => $expired,
                     'u_ip'              => $request->ip(),
                 ];
-                User::create($attribute);
+                $user = User::create($attribute);
+                Stats::insert([
+                    's_time'        => strtotime('today'),
+                    's_type'        => 'uv',
+                    's_account_id'  => null,
+                    's_uid'         => $user->u_id
+                ]);
             }
 
             return $this->responseSuccess($token);

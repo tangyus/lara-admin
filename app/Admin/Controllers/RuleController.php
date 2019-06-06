@@ -109,7 +109,7 @@ class RuleController extends Controller
         $grid->actions(function ($actions) {
             $actions->disableDelete();
             if (!Admin::user()->isRole('市场人员')) {
-                $actions->disableEdit();
+                $actions->disableEdit(false);
             }
         });
         $grid->disableRowSelector();

@@ -34,3 +34,5 @@ Encore\Admin\Show::init(function (Encore\Admin\Show $show) {
         $tools->disableList();
     });
 });
+
+Admin::js('vendor/laravel-admin-ext/chartjs/Chart.bundle.min.js');

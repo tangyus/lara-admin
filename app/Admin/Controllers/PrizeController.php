@@ -255,8 +255,6 @@ class PrizeController extends Controller
                 if (in_array($form->input('p_type'), [Prize::NEW_PRIZE, Prize::ADVANCE_PRIZE])) {
                     $form->input('p_deadline', '2019-09-15 23:59:59');
                 }
-//                dd($form->p_apply_shop);
-//                dd($form->input('p_apply_city'));
             });
         }
         if ($prize) {
@@ -281,18 +279,17 @@ class PrizeController extends Controller
         }
         $form->datetime('p_deadline', '领取截止时间')->placeholder('领取截止时间')->disable();
 
-        if ($prize && in_array($prize->p_type, [Prize::EXCHANGE_PRIZE, Prize::LEGEND_PRIZE]) && !strpos($prize->p_name, '优惠券')) {
-            $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
-                if (Admin::user()->isRole('市场人员')) {
-                    $account = Account::where('a_account', Admin::user()->username)->first();
-                    $query->where('s_account_id', $account->a_id);
-                    $query->where('s_state', 0);
-                }
-            })->get()->pluck('s_name', 's_id'));
-            $form->text('p_phone_number', '活动热线');
-            $form->text('p_rule', '领取规则');
-            $form->image('p_img', '礼品图')->uniqueName()->move('prizes')->disable();
-        }
+        $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
+            if (Admin::user()->isRole('市场人员')) {
+                $account = Account::where('a_account', Admin::user()->username)->first();
+                $query->where('s_account_id', $account->a_id);
+                $query->where('s_state', 0);
+            }
+        })
+        ->get()
+        ->pluck('s_name', 's_id'))->help('优惠券/新人礼/进阶礼/会员礼不需设定门店');
+        $form->text('p_phone_number', '活动热线')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
+        $form->text('p_rule', '领取规则')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
         $form->switch('p_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {

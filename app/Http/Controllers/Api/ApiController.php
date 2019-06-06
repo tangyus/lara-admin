@@ -9,6 +9,7 @@ use App\Model\PointRecord;
 use App\model\Prize;
 use App\Model\Rule;
 use App\model\Shop;
+use App\Model\Stats;
 use App\Model\User;
 use App\Model\UserPrize;
 use Carbon\Carbon;
@@ -19,6 +20,22 @@ use Illuminate\Support\Facades\DB;
 class ApiController extends Controller
 {
     /**
+     * PV
+     */
+    public function pv()
+    {
+        $user = User::where('u_token', request()->header('s3rd', ''))->first();
+        Stats::insert([
+            's_time'        => strtotime('today'),
+            's_type'        => 'pv',
+            's_account_id'  => $user ? $user->u_account_id : null,
+            's_uid'         => $user ? $user->u_account_id : null
+        ]);
+
+        return $this->responseSuccess(1);
+    }
+
+    /**
      * 扫描二维码，处理券码积分
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -26,7 +43,13 @@ class ApiController extends Controller
     public function codeCheck(Request $request)
     {
         $code = $request->input('code');
-        $nick = $request->input('nick');
+        $nick = preg_replace_callback(
+            '/./u',
+            function (array $match) {
+                return strlen($match[0]) >= 4 ? '' : $match[0];
+            },
+            $request->input('nick')
+        );
         $head = $request->input('head');
         $phone = $request->input('phone');
 
@@ -353,8 +376,8 @@ class ApiController extends Controller
 					'aid'           => $prize->p_id,
 					'name'          => $prize->p_name,
 					'img'           => $prize->p_img,
-					'needSaveInfo'  => strpos($prize->p_name, '鞋') ? 1 : 0,
-					'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+					'needSaveInfo'  => ($prize->p_type_id == 7) ? 1 : 0,
+					'isCoupon'      => (in_array($prize->p_type_id, [5, 6])) ? 1 : 0,
 					'applyShop'	    => $prize->p_apply_shop,
 					'applyCity'	    => $prize->p_apply_city,
 					'rule'		    => $prize->p_rule,
@@ -426,12 +449,15 @@ class ApiController extends Controller
 			$user->save();
 
             DB::table('lottery_logs')->insert(['ll_uid' => $user->u_id, 'll_day' => strtotime('today'), 'll_created' => date('Y-m-d H:i:s')]);
-			$prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])->get();
+			$prizeList = Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])
+                ->orderBy('p_type_id', 'asc')
+                ->get();
 			$randArr = [];
 			foreach ($prizeList as $item) {
 				$randArr[] = (int) ($item->p_rate * 100);
 			}
 
+            $result = 0; // 默认中饮品
 			//概率数组的总概率精度
 			$proSum = array_sum($randArr);
 			//概率数组循环
@@ -445,52 +471,58 @@ class ApiController extends Controller
 				}
 			}
 
-			if (isset($result)) {
-				if (strpos($prizeList[$result]->p_name, '30优惠券')) {
-					$couponCode = DB::table('coupon_codes')->where(['cc_type' => 1, 'cc_used' => 0])->first();
-				} elseif (strpos($prizeList[$result]->p_name, '50优惠券')) {
-					$couponCode = DB::table('coupon_codes')->where(['cc_type' => 2, 'cc_used' => 0])->first();
-				}
-
-				// 插入用户中奖数据
-				$userPrize = UserPrize::create([
-					'up_uid'        => $user->u_id,
-					'up_type'       => '抽奖',
-					'up_prize_id'   => $prizeList[$result]->p_id,
-					'up_code'       => isset($couponCode) ? $couponCode->cc_code : date('His').mt_rand(1000, 9999)
-				]);
-				// 修改优惠券码为已使用
-				if (isset($couponCode)) {
-					DB::table('coupon_codes')->where('cc_id', $couponCode->cc_id)->update(['cc_used' => 1, 'cc_up_id' => $userPrize->up_id]);
-				}
-
-				Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
-				$data = [
-					'name'          => $prizeList[$result]->p_name,
-					'img'           => $prizeList[$result]->p_img,
-					'received'      => 0,
-					'code'          => $userPrize->up_code,
-					'aid'           => $prizeList[$result]->p_id,
-					'needSaveInfo'  => strpos($prizeList[$result]->p_name, '鞋') ? 1 : 0,
-					'isCoupon' 	    => strpos($prizeList[$result]->p_name, '优惠券') ? 1 : 0,
-					'id'		    => $userPrize->up_id,
-					'applyCity'	    => $prizeList[$result]->p_apply_city,
-					'applyShop'	    => $prizeList[$result]->p_apply_shop,
-					'rule'		    => $prizeList[$result]->p_rule,
-					'deadline'	    => $prizeList[$result]->p_deadline,
-					'phoneNumber'	=> $prizeList[$result]->p_phone_number,
-                    'number'        => ''
-				];
-                Shop::whereIn('s_id', $prizeList[$result]->p_apply_shop)
-                    ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
-                    ->get()
-                    ->map(function ($item) use (&$data) {
-                        $data['shops'][] = $item;
-                    });
-				$mark = $prizeList[$result]->p_name;
-			} else {
-                $mark = '积分抽奖';
+            // 中奖奖品
+            $prize = $prizeList[$result];
+			if ($prize->p_type_id == 7) {
+                $userPrizeOfShoe = UserPrize::where(['up_prize_id' => $prize->p_id, 'up_openid' => $user->u_openid])->first();
+                if ($userPrizeOfShoe) {
+                    // 已经中过跑鞋，则默认只能中一个饮品
+                    $prize = $prizeList[0];
+                }
             }
+            if ($prize->p_type_id == 5) {
+                $couponCode = DB::table('coupon_codes')->where(['cc_type' => 1, 'cc_used' => 0])->first();
+            } elseif ($prize->p_type_id == 6) {
+                $couponCode = DB::table('coupon_codes')->where(['cc_type' => 2, 'cc_used' => 0])->first();
+            }
+
+            // 插入用户中奖数据
+            $userPrize = UserPrize::create([
+                'up_uid'        => $user->u_id,
+                'up_openid'     => $user->u_openid,
+                'up_type'       => '抽奖',
+                'up_prize_id'   => $prize->p_id,
+                'up_code'       => isset($couponCode) ? $couponCode->cc_code : date('His').mt_rand(1000, 9999)
+            ]);
+            // 修改优惠券码为已使用
+            if (isset($couponCode)) {
+                DB::table('coupon_codes')->where('cc_id', $couponCode->cc_id)->update(['cc_used' => 1, 'cc_up_id' => $userPrize->up_id]);
+            }
+
+            Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
+            $data = [
+                'name'          => $prize->p_name,
+                'img'           => $prize->p_img,
+                'received'      => 0,
+                'code'          => $userPrize->up_code,
+                'aid'           => $prize->p_id,
+                'needSaveInfo'  => ($prize->p_type_id == 7) ? 1 : 0,
+                'isCoupon' 	    => in_array($prize->p_type_id, [5, 6]) ? 1 : 0,
+                'id'		    => $userPrize->up_id,
+                'applyCity'	    => $prize->p_apply_city,
+                'applyShop'	    => $prize->p_apply_shop,
+                'rule'		    => $prize->p_rule,
+                'deadline'	    => $prize->p_deadline,
+                'phoneNumber'	=> $prize->p_phone_number,
+                'number'        => ''
+            ];
+            Shop::whereIn('s_id', $prize->p_apply_shop)
+                ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+                ->get()
+                ->map(function ($item) use (&$data) {
+                    $data['shops'][] = $item;
+                });
+            $mark = $prize->p_name;
             // 扣去用户积分
             $pointRecord = new PointRecord();
             $pointRecordAttribute = $pointRecord->setAttributes(Prize::LEGEND_PRIZE, $mark, 1, -50, $user->u_current_point);
@@ -517,17 +549,18 @@ class ApiController extends Controller
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
-            ->select(DB::raw('p_name as name, p_img as img, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_number as number'))
+            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
             ->get()
             ->map(function ($item, $key) use (&$data, $shops) {
                 $data[$key] = $item;
-                $data[$key]['needSaveInfo'] = strpos($item->name, '鞋') ? 1 : 0;
-                $data[$key]['isCoupon'] = strpos($item->name, '优惠券') ? 1 : 0;
+                $data[$key]['needSaveInfo'] = ($item->typeId == 7) ? 1 : 0;
+                $data[$key]['isCoupon'] = in_array($item->typeId, [5, 6]) ? 1 : 0;
                 $applyShopIds = explode('-', $item->p_apply_shop);
                 $data[$key]['applyShop'] = $applyShopIds;
+                unset($data[$key]['typeId']);
 
                 $tempShops = [];
                 foreach ($shops as $shop) {
@@ -590,8 +623,8 @@ class ApiController extends Controller
 					'rule'          => $prize->p_rule,
 					'deadline'      => $prize->p_deadline,
 					'phoneNumber'   => $prize->p_phone_number,
-                    'needSaveInfo'  => strpos($prize->p_name, '鞋') ? 1 : 0,
-                    'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+                    'needSaveInfo'  => ($prize->p_type_id == 7) ? 1 : 0,
+                    'isCoupon'      => in_array($prize->p_type_id, [5, 6]) ? 1 : 0,
                     'shops'         => []
 				];
                 foreach ($shops as $shop) {
@@ -656,8 +689,8 @@ class ApiController extends Controller
                 'phoneNumber'   => $prize->p_phone_number,
                 'code'          => $codeStr,
                 'received'      => 0,
-                'needSaveInfo'  => strpos($prize->p_name, '鞋') ? 1 : 0,
-                'isCoupon'      => strpos($prize->p_name, '优惠券') ? 1 : 0,
+                'needSaveInfo'  => ($prize->p_type_id == 7) ? 1 : 0,
+                'isCoupon'      => in_array($prize->p_type_id, [5, 6]) ? 1 : 0,
                 'number'        => ''
             ];
             Shop::whereIn('s_id', $prize->p_apply_shop)
@@ -687,17 +720,18 @@ class ApiController extends Controller
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '兑换'])
-            ->select(DB::raw('p_name as name, p_img as img, p_point as point, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code, up_number as number'))
+            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, p_point as point, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
             ->get()
             ->map(function ($item, $key) use (&$data, $shops) {
                 $data[$key] = $item;
-                $data[$key]['needSaveInfo'] = strpos($item->name, '鞋') ? 1 : 0;
-                $data[$key]['isCoupon'] = strpos($item->name, '优惠券') ? 1 : 0;
+                $data[$key]['needSaveInfo'] = ($item->typeId == 7) ? 1 : 0;
+                $data[$key]['isCoupon'] = in_array($item->typeId, [5, 6]) ? 1 : 0;
                 $applyShopIds = explode('-', $item->p_apply_shop);
                 $data[$key]['applyShop'] = $applyShopIds;
+                unset($data[$key]['typeId']);
 
                 $tempShops = [];
                 foreach ($shops as $shop) {

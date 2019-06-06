@@ -21,6 +21,7 @@ Route::group([
 ], function (\Illuminate\Routing\Router $router) {
 	$router->post('auth', 'AuthController@auth');
 	$router->post('user_info', 'AuthController@decryptUserInfo');
+	$router->post('pv', 'ApiController@pv');
 
 	$router->group(['middleware' => 'miniprogram.auth'], function ($router) {
 	    $router->post('code_check', 'ApiController@codeCheck');
