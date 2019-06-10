@@ -2,6 +2,7 @@
 
 namespace App\Admin\Extensions;
 
+use App\model\Account;
 use App\model\Prize;
 use Encore\Admin\Facades\Admin;
 use Encore\Admin\Grid;
@@ -13,7 +14,7 @@ class PrizeExporter extends ExcelExporter implements WithStrictNullComparison
 {
     use Exportable;
 
-    protected $fileName = '区域门店.csv';
+    protected $fileName = '区域礼品.csv';
 
     protected $columns = [
         'p_type'            => '礼品类型',
@@ -41,6 +42,15 @@ class PrizeExporter extends ExcelExporter implements WithStrictNullComparison
 
     public function query()
     {
-        return Prize::query()->leftJoin('accounts', 'p_account_id', 'a_id')->select(array_keys($this->columns));
+        return Prize::query()
+			->leftJoin('accounts', 'p_account_id', 'a_id')
+			->where(function ($query) {
+				if (Admin::user()->isRole('市场人员')) {
+					// 修改数据来源
+					$account = Account::where('a_account', Admin::user()->username)->first();
+					$query->where('p_account_id', $account->a_id);
+				}
+			})
+			->select(array_keys($this->columns));
     }
 }

@@ -24,7 +24,7 @@ class IndexController extends Controller
 
         ApiLog::insert([
             'user_id'   => null,
-            'shop_id'   => $this->shop ? $shop->shop->s_id : null,
+            'shop_id'   => $this->shop ? $this->shop->s_id : null,
             'path'      => request()->path(),
             'method'    => request()->method(),
             'ip'        => request()->ip(),
