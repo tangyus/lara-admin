@@ -59,107 +59,7 @@ class ApiController extends Controller
                 ->leftJoin('accounts', 'a_id', 'q_account_id')
                 ->where(['c_code' => $code])
                 ->first();
-            if ($codeInfo && $codeInfo->c_used == 0) {
-                if (!empty($codeInfo->a_scan_times)) {
-                    $count = PointRecord::where(['pr_uid' => $user->u_id, 'pr_prize_name' => '产品购买'])->whereDay('pr_created', date('d'))->count();
-                    if ($codeInfo->a_scan_times - $count <= 0) {
-                        return response()->json([
-                            'result' 	=> 1002,
-                            'message' 	=> 'Scan times limit!',
-                            'data' 		=> [],
-                        ]);
-                    }
-                }
-                if (time() > strtotime($codeInfo->q_expired)) {
-                    if (!empty($user->u_account_id)) {
-                        User::where('u_id', Auth::id())->update([
-                            'u_city'            => $codeInfo->q_city,
-                            'u_account_id'      => $codeInfo->q_account_id,
-                            'u_nick'            => $nick,
-                            'u_headimg'         => $head,
-                            'u_phone'           => $phone
-                        ]);
-                    }
-                    return response()->json([
-                        'result' 	=> 1001,
-                        'message' 	=> 'Code Is Expired!',
-                        'data' 		=> [],
-                    ]);
-                }
-
-                DB::beginTransaction();
-                try {
-                    $qPoint = $codeInfo->q_point;
-                    $attributes = [];
-                    // 判断是否为会员日
-                    $isDayOfWeek = (new Carbon())->isDayOfWeek($codeInfo->q_member_date);
-                    $point = $isDayOfWeek ? ($qPoint * 2) : $qPoint;
-
-                    $codeCity = $codeInfo->q_city;
-                    if (!empty($user->u_city) && $user->u_city != $codeCity) {
-                        // 不同城市，重新建立用户账号
-                        $cityUserExists = User::where(['u_openid' => $user->u_openid, 'u_city' => $codeCity])->first();
-                        if ($cityUserExists) {
-                            $token = $cityUserExists->u_token;
-                            Auth::setUser($cityUserExists);
-                        } else {
-                            $token = sha1(time() . uniqid());
-                            Auth::setUser(User::create([
-                                'u_openid'          => $user->u_openid,
-                                'u_nick'            => $user->u_nick,
-                                'u_headimg'         => $user->u_headimg,
-                                'u_phone'           => $user->u_phone,
-                                'u_token'           => $token,
-                                'u_expired'         => time() + 7000,
-                                'u_current_point'   => 0,
-                                'u_total_point'     => 0,
-                                'u_ip'              => $request->ip()
-                            ]));
-                        }
-                        $user = Auth::user();
-                    }
-
-                    User::where('u_id', Auth::id())->update([
-                        'u_current_point'   => $user->u_current_point + $point,
-                        'u_total_point'     => $user->u_total_point + $point,
-                        'u_city'            => $codeCity,
-                        'u_account_id'      => $codeInfo->q_account_id,
-                        'u_nick'            => $nick,
-                        'u_headimg'         => $head,
-                        'u_phone'           => $phone
-                    ]);
-
-                    $pointRecord = new PointRecord();
-                    // 是否第一次扫码
-                    $isFirst = PointRecord::where(['pr_uid' => Auth::id(), 'pr_prize_type' => Prize::NEW_PRIZE])->first();
-                    if (!$isFirst) {
-                        // 闪电新人礼
-                        $attributes[] = $pointRecord->setAttributes(Prize::NEW_PRIZE, Prize::NEW_PRIZE, 0, $qPoint, 0);
-                    }
-                    $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, '产品购买', 1, $qPoint, $user->u_current_point + $qPoint);
-                    // 判断是否为会员日
-                    if ($isDayOfWeek) {
-                        $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, Prize::MEMBER_PRIZE, 1, $qPoint, $user->u_current_point + $qPoint * 2);
-                    }
-                    // 增加积分记录
-                    PointRecord::insert($attributes);
-
-                    // 券码设置为已使用
-                    $codeInfo->c_used = 1;
-                    $codeInfo->save();
-
-                    DB::commit();
-                    return $this->responseSuccess([
-                        'double'    => $isDayOfWeek ? 1 : 0,
-                        'point'     => $isDayOfWeek ? $point / 2 : $point,
-                        'first'     => $isFirst ? 0 : 1,
-                        'diff'      => !empty($token) ? 1 : 0,
-                        'token'     => !empty($token) ? $token : ''
-                    ]);
-                } catch (\Exception $e) {
-                    return $this->responseFail($e->getMessage());
-                }
-            } else {
+            if (!$codeInfo || $codeInfo->c_used != 0) {
                 if ($codeInfo && empty($user->u_city)) {
                     User::where('u_id', Auth::id())->update([
                         'u_city'            => $codeInfo->q_city,
@@ -171,7 +71,101 @@ class ApiController extends Controller
                 }
                 return $this->responseFail('Invalid Code!');
             }
+
+            // 判断扫码次数限制
+            if (!empty($codeInfo->a_scan_times)) {
+                $userOfCodeCity = User::where(['u_account_id' => $codeInfo->q_account_id, 'u_openid' => $user->u_openid])->first();
+                if ($userOfCodeCity) {
+                    $count = PointRecord::where(['pr_uid' => $userOfCodeCity->u_id, 'pr_prize_name' => '产品购买'])->whereDay('pr_created', date('d'))->count();
+                    if ($codeInfo->a_scan_times - $count <= 0) {
+                        return $this->responseDefine(1002, 'Scan times limit!');
+                    }
+                }
+            }
+            if (time() > strtotime($codeInfo->q_expired)) {
+                if (!empty($user->u_account_id)) {
+                    User::where('u_id', Auth::id())->update([
+                        'u_city'            => $codeInfo->q_city,
+                        'u_account_id'      => $codeInfo->q_account_id,
+                        'u_nick'            => $nick,
+                        'u_headimg'         => $head,
+                        'u_phone'           => $phone
+                    ]);
+                }
+                return $this->responseDefine(1001, 'Code Is Expired!');
+            }
+
+            DB::beginTransaction();
+            $qPoint = $codeInfo->q_point;
+            $attributes = [];
+            // 判断是否为会员日
+            $isDayOfWeek = (new Carbon())->isDayOfWeek($codeInfo->q_member_date);
+            $point = $isDayOfWeek ? ($qPoint * 2) : $qPoint;
+
+            $codeCity = $codeInfo->q_city;
+            if (!empty($user->u_city) && $user->u_city != $codeCity) {
+                // 不同城市，重新建立用户账号
+                $cityUserExists = User::where(['u_openid' => $user->u_openid, 'u_city' => $codeCity])->first();
+                if ($cityUserExists) {
+                    $token = $cityUserExists->u_token;
+                    Auth::setUser($cityUserExists);
+                } else {
+                    $token = sha1(time() . uniqid());
+                    Auth::setUser(User::create([
+                        'u_openid'          => $user->u_openid,
+                        'u_nick'            => $user->u_nick,
+                        'u_headimg'         => $user->u_headimg,
+                        'u_phone'           => $user->u_phone,
+                        'u_token'           => $token,
+                        'u_expired'         => time() + 7000,
+                        'u_current_point'   => 0,
+                        'u_total_point'     => 0,
+                        'u_ip'              => $request->ip()
+                    ]));
+                }
+                $user = Auth::user();
+            }
+
+            User::where('u_id', Auth::id())->update([
+                'u_current_point'   => $user->u_current_point + $point,
+                'u_total_point'     => $user->u_total_point + $point,
+                'u_city'            => $codeCity,
+                'u_account_id'      => $codeInfo->q_account_id,
+                'u_nick'            => $nick,
+                'u_headimg'         => $head,
+                'u_phone'           => $phone
+            ]);
+
+            $pointRecord = new PointRecord();
+            // 是否第一次扫码
+            $isFirst = PointRecord::where(['pr_uid' => Auth::id(), 'pr_prize_type' => Prize::NEW_PRIZE])->first();
+            if (!$isFirst) {
+                // 闪电新人礼
+                $attributes[] = $pointRecord->setAttributes(Prize::NEW_PRIZE, Prize::NEW_PRIZE, 0, $qPoint, 0);
+            }
+            $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, '产品购买', 1, $qPoint, $user->u_current_point + $qPoint);
+            // 判断是否为会员日
+            if ($isDayOfWeek) {
+                $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, Prize::MEMBER_PRIZE, 1, $qPoint, $user->u_current_point + $qPoint * 2);
+            }
+            // 增加积分记录
+            PointRecord::insert($attributes);
+
+            // 券码设置为已使用
+            $codeInfo->c_used = 1;
+            $codeInfo->c_uid = $user->u_id;
+            $codeInfo->save();
+
+            DB::commit();
+            return $this->responseSuccess([
+                'double'    => $isDayOfWeek ? 1 : 0,
+                'point'     => $isDayOfWeek ? $point / 2 : $point,
+                'first'     => $isFirst ? 0 : 1,
+                'diff'      => !empty($token) ? 1 : 0,
+                'token'     => !empty($token) ? $token : ''
+            ]);
         } catch (\Exception $e) {
+            DB::rollback();
             return $this->responseFail($e->getMessage());
         }
     }
@@ -301,7 +295,7 @@ class ApiController extends Controller
 				$query->where('pr_point', ($type == 1) ? '>' : '<', 0);
 			})
 			->orderBy('pr_updated', 'asc')
-			->select(DB::raw('pr_id, pr_point, pr_current_point, pr_created, pr_prize_type, pr_prize_name'))
+			->select(DB::raw('pr_id, pr_point, pr_current_point, pr_updated, pr_prize_type, pr_prize_name'))
 			->offset(($page - 1) * $pageSize)
 			->limit($pageSize)
 			->get()
@@ -310,7 +304,7 @@ class ApiController extends Controller
 					'id'            => $item['pr_id'],
 					'point' 		=> $item['pr_point'],
 					'currentPoint' 	=> $item['pr_current_point'],
-					'date' 			=> date('Y-m-d', strtotime($item['pr_created'])),
+					'date' 			=> date('Y-m-d', strtotime($item['pr_updated'])),
 					'type' 			=> $item['pr_prize_type'],
 					'name'			=> $item['pr_prize_name']
 				];
@@ -329,32 +323,30 @@ class ApiController extends Controller
         $pointType = $request->input('receiveType');
 
         $pointRecord = PointRecord::where(['pr_prize_type' => $pointType, 'pr_uid' => Auth::id(), 'pr_received' => 0])->first();
-        if ($pointRecord) {
-            $user = Auth::user();
-
-            DB::beginTransaction();
-            try {
-                $currentPoint = $user->u_current_point + $pointRecord->pr_point;
-                User::where('u_id', $user->u_id)->update([
-                    'u_current_point'   => $currentPoint,
-                    'u_total_point'     => $user->u_total_point + $pointRecord->pr_point
-                ]);
-
-                PointRecord::where('pr_id', $pointRecord->pr_id)->update([
-                    'pr_current_point'  => $currentPoint,
-                    'pr_received'       => 1
-                ]);
-
-                // 增加奖品领取量
-                Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => $pointType])->increment('p_receive_number');
-                DB::commit();
-                return $this->responseSuccess($pointRecord->pr_point);
-            } catch (\Exception $e) {
-                DB::rollback();
-                return $this->responseFail($e->getMessage());
-            }
-        } else {
+        if (!$pointRecord) {
             return $this->responseFail('No Type Point Receive!');
+        }
+
+        $user = Auth::user();
+        DB::beginTransaction();
+        try {
+            $currentPoint = $user->u_current_point + $pointRecord->pr_point;
+            User::where('u_id', $user->u_id)->update([
+                'u_current_point'   => $currentPoint,
+                'u_total_point'     => $user->u_total_point + $pointRecord->pr_point
+            ]);
+            PointRecord::where('pr_id', $pointRecord->pr_id)->update([
+                'pr_current_point'  => $currentPoint,
+                'pr_received'       => 1
+            ]);
+
+            // 增加奖品领取量
+            Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => $pointType])->increment('p_receive_number');
+            DB::commit();
+            return $this->responseSuccess($pointRecord->pr_point);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return $this->responseFail($e->getMessage());
         }
 	}
 
@@ -381,7 +373,7 @@ class ApiController extends Controller
 					'applyShop'	    => $prize->p_apply_shop,
 					'applyCity'	    => $prize->p_apply_city,
 					'rule'		    => $prize->p_rule,
-					'deadline'	    => $prize->p_deadline,
+					'deadline'	    => date('Y年m月d日', strtotime($prize->p_deadline)),
 					'phoneNumber'	=> $prize->p_phone_number,
                     'shops'         => []
 				];
@@ -432,11 +424,7 @@ class ApiController extends Controller
         if ($account && !empty($account->a_lottery_times)) {
             $count = DB::table('lottery_logs')->where(['ll_uid' => $user->u_id, 'll_day' => strtotime('today')])->count();
             if ($account->a_lottery_times - $count <= 0) {
-                response()->json([
-                    'result' 	=> 1001,
-                    'message' 	=> 'Today has lottery!',
-                    'data' 		=> [],
-                ]);
+                return $this->responseDefine(1001, 'Today has lottery!');
             }
         }
 
@@ -458,9 +446,9 @@ class ApiController extends Controller
 			}
 
             $result = 0; // 默认中饮品
-			//概率数组的总概率精度
+			// 概率数组的总概率精度
 			$proSum = array_sum($randArr);
-			//概率数组循环
+			// 随机中奖
 			foreach ($randArr as $key => $value) {
 				$rand = mt_rand(1, $proSum);
 				if ($rand <= $value) {
@@ -476,14 +464,19 @@ class ApiController extends Controller
 			if ($prize->p_type_id == 7) {
                 $userPrizeOfShoe = UserPrize::where(['up_prize_id' => $prize->p_id, 'up_openid' => $user->u_openid])->first();
                 if ($userPrizeOfShoe) {
-                    // 已经中过跑鞋，则默认只能中一个饮品
+                    // 已经中过跑鞋，则默认中饮品
                     $prize = $prizeList[0];
                 }
             }
-            if ($prize->p_type_id == 5) {
-                $couponCode = DB::table('coupon_codes')->where(['cc_type' => 1, 'cc_used' => 0])->first();
-            } elseif ($prize->p_type_id == 6) {
-                $couponCode = DB::table('coupon_codes')->where(['cc_type' => 2, 'cc_used' => 0])->first();
+            // 若奖品已抽完，则默认中饮品
+            if ($prize->p_received_number >= $prize->p_number) {
+                $prize = $prizeList[0];
+            }
+
+            // 优惠券发放券码
+            if (in_array($prize->p_type_id, [5, 6])) {
+			    $cType = ($prize->p_type_id == 5) ? 1 : 2;
+                $couponCode = DB::table('coupon_codes')->where(['cc_type' => $cType, 'cc_used' => 0])->first();
             }
 
             // 插入用户中奖数据
@@ -512,7 +505,7 @@ class ApiController extends Controller
                 'applyCity'	    => $prize->p_apply_city,
                 'applyShop'	    => $prize->p_apply_shop,
                 'rule'		    => $prize->p_rule,
-                'deadline'	    => $prize->p_deadline,
+                'deadline'	    => date('Y年m月d日', strtotime($prize->p_deadline)),
                 'phoneNumber'	=> $prize->p_phone_number,
                 'number'        => ''
             ];
@@ -549,7 +542,7 @@ class ApiController extends Controller
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
-            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_number as number'))
+            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, up_received as received, up_code as code, p_id as aid, up_id as id, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline, p_phone_number as phoneNumber, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
@@ -558,6 +551,8 @@ class ApiController extends Controller
                 $data[$key] = $item;
                 $data[$key]['needSaveInfo'] = ($item->typeId == 7) ? 1 : 0;
                 $data[$key]['isCoupon'] = in_array($item->typeId, [5, 6]) ? 1 : 0;
+
+                $data[$key]['deadline'] = date('Y年m月d日', strtotime($item->p_deadline));
                 $applyShopIds = explode('-', $item->p_apply_shop);
                 $data[$key]['applyShop'] = $applyShopIds;
                 unset($data[$key]['typeId']);
@@ -621,7 +616,7 @@ class ApiController extends Controller
 					'applyCity'     => $prize->p_apply_city,
 					'applyShop'     => $prize->p_apply_shop,
 					'rule'          => $prize->p_rule,
-					'deadline'      => $prize->p_deadline,
+					'deadline'      => date('Y年m月d日', strtotime($prize->p_deadline)),
 					'phoneNumber'   => $prize->p_phone_number,
                     'needSaveInfo'  => ($prize->p_type_id == 7) ? 1 : 0,
                     'isCoupon'      => in_array($prize->p_type_id, [5, 6]) ? 1 : 0,
@@ -654,6 +649,9 @@ class ApiController extends Controller
         if ($user->u_current_point < $prize->p_point) {
             return $this->responseSuccess(['pointIsNotEnough' => 1, 'data' => []]);
         }
+        if (($prize->p_number - $prize->p_used_number) <= 0) {
+            return $this->responseFail('奖品已被兑换完');
+        }
 
         DB::beginTransaction();
         try {
@@ -685,7 +683,7 @@ class ApiController extends Controller
                 'applyCity'     => $prize->p_apply_city,
                 'applyShop'     => $prize->p_apply_shop,
                 'rule'          => $prize->p_rule,
-                'deadline'      => $prize->p_deadline,
+                'deadline'      => date('Y年m月d日', strtotime($prize->p_deadline)),
                 'phoneNumber'   => $prize->p_phone_number,
                 'code'          => $codeStr,
                 'received'      => 0,
@@ -720,7 +718,7 @@ class ApiController extends Controller
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '兑换'])
-            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, p_point as point, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline as deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code, up_number as number'))
+            ->select(DB::raw('p_name as name, p_img as img, p_type_id as typeId, p_point as point, p_apply_city as applyCity, p_apply_shop, p_rule as rule, p_deadline, p_phone_number as phoneNumber, up_received as received, up_id as id, up_code as code, up_number as number'))
             ->orderBy('up_id', 'desc')
             ->offset(($page - 1) * $pageSize)
             ->limit($pageSize)
@@ -729,6 +727,8 @@ class ApiController extends Controller
                 $data[$key] = $item;
                 $data[$key]['needSaveInfo'] = ($item->typeId == 7) ? 1 : 0;
                 $data[$key]['isCoupon'] = in_array($item->typeId, [5, 6]) ? 1 : 0;
+                $data[$key]['deadline'] = date('Y年m月d日', strtotime($item->p_deadline));
+
                 $applyShopIds = explode('-', $item->p_apply_shop);
                 $data[$key]['applyShop'] = $applyShopIds;
                 unset($data[$key]['typeId']);

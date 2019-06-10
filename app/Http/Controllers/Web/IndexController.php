@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Web;
 
 use App\Exports\UserPrizeExport;
 use App\Http\Controllers\Controller;
+use App\Model\ApiLog;
 use App\model\Prize;
 use App\model\Shop;
 use App\Model\UserPrize;
+use Carbon\Carbon;
 use EasyWeChat\Factory;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -19,6 +21,17 @@ class IndexController extends Controller
     {
         $shop = Shop::leftJoin('accounts', 'a_id', 's_account_id')->where('s_token', request()->header('token', ''))->first();
         $this->shop = $shop;
+
+        ApiLog::insert([
+            'user_id'   => null,
+            'shop_id'   => $this->shop ? $shop->shop->s_id : null,
+            'path'      => request()->path(),
+            'method'    => request()->method(),
+            'ip'        => request()->ip(),
+            'input'     => json_encode(request()->input()),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
+        ]);
     }
 
     /**

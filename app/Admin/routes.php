@@ -18,8 +18,6 @@ Route::group([
 
     // 区域账号管理
     $router->get('accounts_list', 'AccountController@accountsList');
-    $router->get('accounts_cities/{account_id}', 'AccountController@accountsCities');
-    $router->get('accounts_info/{type}', 'AccountController@accountsDetail');
     $router->resource('accounts', AccountController::class, ['except' => ['destroy']]);
 
     // 区域门店管理
@@ -27,7 +25,7 @@ Route::group([
     $router->resource('shops', ShopController::class, ['except' => ['destroy']]);
 
     // 区域礼品管理
-    $router->resource('prizes', PrizeController::class, ['except' => ['destroy']]);
+    $router->resource('prizes', PrizeController::class, ['except' => ['destroy', 'create', 'store']]);
 
     // 用户管理
     $router->get('users/point_record', 'UserController@pointRecord');
@@ -42,4 +40,6 @@ Route::group([
 
     // 规则管理
     $router->resource('rules', RuleController::class, ['except' => ['delete']]);
+
+    $router->get('api_logs', 'ApiLogController@index');
 });

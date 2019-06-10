@@ -20,7 +20,7 @@ class PointRecordExporter extends ExcelExporter
         'u_phone'           => '用户手机号',
         'pr_prize_type'     => '礼品类型',
         'pr_prize_name'     => '礼品名称',
-        'pr_created'        => '获取/消耗时间',
+        'pr_created'        => '时间',
         'pr_point'          => '获得/消耗积分',
         'pr_current_point'  => '当前用户积分',
     ];

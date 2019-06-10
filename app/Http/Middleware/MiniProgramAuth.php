@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Model\ApiLog;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class MiniProgramAuth
@@ -11,6 +13,15 @@ class MiniProgramAuth
 		if (!Auth::user()) {
 			return response()->json(['message' => 'Permission Not Allowed!', 'result' => 1000]);
 		}
+        ApiLog::insert([
+            'user_id'   => Auth::user() ? Auth::id() : null,
+            'path'      => request()->path(),
+            'method'    => request()->method(),
+            'ip'        => request()->ip(),
+            'input'     => json_encode(request()->input()),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
+        ]);
 
 		return $next($request);
 	}

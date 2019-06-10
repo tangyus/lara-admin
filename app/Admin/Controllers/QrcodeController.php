@@ -13,7 +13,6 @@ use Encore\Admin\Facades\Admin;
 use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
-use Illuminate\Support\Facades\DB;
 
 class QrcodeController extends Controller
 {
@@ -95,9 +94,7 @@ class QrcodeController extends Controller
 
         $grid->disableRowSelector();
         $grid->disableFilter();
-        if (Admin::user()->cannot('qrcodes.create')) {
-            $grid->disableCreateButton();
-        }
+        $grid->disableActions();
 
         if (Admin::user()->isRole('市场人员')) {
             $grid->actions(function ($actions) {
@@ -106,9 +103,10 @@ class QrcodeController extends Controller
                 $actions->disableView();
 
                 $row = $actions->row;
-                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
+//                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
             });
         } else {
+            $grid->disableCreateButton();
             $grid->disableActions();
         }
 
@@ -148,9 +146,9 @@ class QrcodeController extends Controller
         $form->ignore('q_district');
 
         // 下载导出二维码
-        $form->saved(function (Form $form) {
-            $this->zipCodes($form->model());
-        });
+//        $form->saved(function (Form $form) {
+//            $this->zipCodes($form->model());
+//        });
 
         return $form;
     }
@@ -165,8 +163,8 @@ class QrcodeController extends Controller
         if (count($codes) > 0) {
             $publicPath = public_path();
             $path = $publicPath . '/download/codes';
-            $time = time();
-            $zipPath = $path . "/{$time}_{$model->q_id}.zip";
+            $date = date('Ymd');
+            $zipPath = $path . "/{$date}_{$model->q_id}.zip";
             $ids = [];
 
             $zip = new \ZipArchive();
@@ -181,7 +179,7 @@ class QrcodeController extends Controller
                 $zip->close(); // 关闭处理的zip文件
                 Code::whereIn('c_id', $ids)->update(['c_qrcode_id' => $model->q_id]);
 
-                $model->q_zip_path = "/download/codes/{$time}_{$model->q_id}.zip";
+                $model->q_zip_path = "/download/codes/{$date}_{$model->q_id}.zip";
                 $model->save();
             }
         }

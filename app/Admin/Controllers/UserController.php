@@ -17,6 +17,7 @@ use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
 use Illuminate\Http\Request;
+use Illuminate\Support\MessageBag;
 
 class UserController extends Controller
 {
@@ -327,7 +328,7 @@ class UserController extends Controller
     protected function userPrizeGrid()
     {
         $grid = new Grid(new UserPrize());
-//        $grid->exporter(new PointRecordExporter());
+
         $grid->model()->leftJoin('users', 'u_id', 'up_uid')
             ->leftJoin('prizes', 'p_id', 'up_prize_id')
             ->leftJoin('shops', 's_id', 'up_shop_id')
@@ -356,7 +357,7 @@ class UserController extends Controller
             ]]);
         });
         $grid->p_type('奖品类型');
-        $grid->up_received('是否领取')->display(function ($received) {
+        $grid->up_received('是否核销')->display(function ($received) {
             return ($received == 1) ? "<span class='label label-success'>是</span>" : "<span class='label label-info'>否</span>";
         });
         $grid->up_code('券码');
@@ -371,7 +372,7 @@ class UserController extends Controller
             ]]);
         });
         $grid->up_number('快递单号')->editable();
-        $grid->up_created('时间');
+        $grid->up_updated('时间');
 
         $grid->disableCreateButton();
         $grid->disableRowSelector();
@@ -395,6 +396,14 @@ class UserController extends Controller
     public function updateUserPrize($id, Request $request)
     {
         $input = $request->input();
-        UserPrize::where('up_id', $id)->update([$input['name'] => $input['value']]);
+        $userPrize = UserPrize::find($id);
+        if ($userPrize) {
+            if ($userPrize->up_received == 0) {
+                Prize::where(['p_id' => $userPrize->up_prize_id])->increment('p_used_number', 1);
+                $update['up_received'] = 1;
+            }
+            $update[$input['name']] = $input['value'];
+            UserPrize::where('up_id', $id)->update($update);
+        }
     }
 }

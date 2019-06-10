@@ -23,7 +23,7 @@ class Controller extends BaseController
 		]);
     }
 
-    public function responseFail($message = 'Success')
+    public function responseFail($message = 'Fail')
     {
         return response()->json([
             'result' 	=> 1000,
@@ -38,6 +38,15 @@ class Controller extends BaseController
             'result' 	=> 800,
             'message' 	=> $message,
             'data' 		=> [],
+        ]);
+    }
+
+    public function responseDefine($result, $message, $data = [])
+    {
+        return response()->json([
+            'result' 	=> $result,
+            'message' 	=> $message,
+            'data' 		=> $data,
         ]);
     }
 
@@ -83,7 +92,7 @@ class Controller extends BaseController
             'log' => [
                 'driver' => 'daily',
                 'level' => 'info',
-                'file' => public_path().'/wechat.log',
+                'file' => 'd:/wechat.log',
             ],
         ];
         $app = Factory::miniProgram($config);
@@ -96,8 +105,46 @@ class Controller extends BaseController
                 'width' => 280,
             ]);
             if ($response instanceof StreamResponse) {
-                $filename = $code->c_code.'_'.$code->c_id.'.jpg';
-                $response->saveAs(public_path() . '/codes', $filename);
+                $filename = $code->c_id.'_'.$code->c_code.'.jpg';
+                $response->saveAs('d:/codes', $filename);
+
+                $code->c_path = '/codes/' . $filename;
+                $code->c_filename = $filename;
+                $code->save();
+                $i++;
+            }
+        }
+        dd($i);
+    }
+
+    public function wxCodeCopy()
+    {
+        $config = [
+            'app_id' => 'wx82de84528e164c9b',
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47',
+
+            // 下面为可选项
+            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
+            'response_type' => 'array',
+
+            'log' => [
+                'driver' => 'daily',
+                'level' => 'info',
+                'file' => 'd:/wechat.log',
+            ],
+        ];
+        $app = Factory::miniProgram($config);
+
+        $codes = Code::where('c_id', '>', '100000')->whereNull('c_path')->limit(10)->get();
+        $i = 0;
+        foreach ($codes as $code) {
+            $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
+                'page'  => 'Pages/Index/Index',
+                'width' => 280,
+            ]);
+            if ($response instanceof StreamResponse) {
+                $filename = $code->c_id.'_'.$code->c_code.'.jpg';
+                $response->saveAs('d:/codes', $filename);
 
                 $code->c_path = '/codes/' . $filename;
                 $code->c_filename = $filename;
