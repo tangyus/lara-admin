@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controllers;
 
+use App\Admin\Extensions\ActExporter;
 use App\model\Account;
 use App\Model\Prize;
 use App\Http\Controllers\Controller;
@@ -40,6 +41,7 @@ class ActController extends Controller
     protected function grid()
     {
         $grid = new Grid(new Prize);
+        $grid->exporter(new ActExporter());
         if (Admin::user()->isRole('市场人员')) {
             // 修改数据来源
             $account = Account::where('a_account', Admin::user()->username)->first();
@@ -61,7 +63,11 @@ class ActController extends Controller
         $grid->disableActions();
         $grid->filter(function ($filter){
             $filter->disableIdFilter();
-            $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
+
+                $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+            });
         });
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();

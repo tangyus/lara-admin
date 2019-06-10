@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Web;
 
 use App\Exports\UserPrizeExport;
 use App\Http\Controllers\Controller;
+use App\Model\ApiLog;
 use App\model\Prize;
 use App\model\Shop;
 use App\Model\UserPrize;
+use Carbon\Carbon;
 use EasyWeChat\Factory;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -19,6 +21,17 @@ class IndexController extends Controller
     {
         $shop = Shop::leftJoin('accounts', 'a_id', 's_account_id')->where('s_token', request()->header('token', ''))->first();
         $this->shop = $shop;
+
+        ApiLog::insert([
+            'user_id'   => null,
+            'shop_id'   => $this->shop ? $shop->shop->s_id : null,
+            'path'      => request()->path(),
+            'method'    => request()->method(),
+            'ip'        => request()->ip(),
+            'input'     => json_encode(request()->input()),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
+        ]);
     }
 
     /**
@@ -92,10 +105,13 @@ class IndexController extends Controller
 
         try {
             $prizeCode = $request->input('code');
-            $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode, 'up_received' => 0])->first();
+            $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode])->first();
             if (!$userPrize) {
-                return $this->responseFail('该奖品已核销或券码无效');
+                return $this->responseFail('该券码不存在');
             }
+			if ($userPrize->up_received == 1) {
+				return $this->responseFail('礼品已核销');
+			}
             if ($userPrize->prize->p_account_id != $this->shop->s_account_id) {
                 return $this->responseFail('该奖品不属于本区域核销');
             }
@@ -127,9 +143,12 @@ class IndexController extends Controller
         $number = $request->input('number');
         $password = $request->input('password');
 
-        if (($number != $this->shop->s_number) || ($password != $this->shop->s_password)) {
-            return $this->responseFail('门店序号或密码不正确!');
+        if ($number != $this->shop->s_number) {
+            return $this->responseFail('门店序号不正确!');
         }
+        if ($password != $this->shop->s_password) {
+			return $this->responseFail('门店核销密码不正确!');
+		}
 
         $userPrize = UserPrize::where(['up_id' => $id, 'up_received' => 0])->first();
         if ($userPrize) {

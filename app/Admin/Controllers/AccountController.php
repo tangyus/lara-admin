@@ -115,24 +115,6 @@ class AccountController
     }
 
     /**
-     * 获取区域详情信息
-     * @param Request $request
-     * @param $type
-     * @return array
-     */
-    public function accountsDetail(Request $request, $type)
-    {
-        $districtId = $request->get('q');
-        if (!empty($districtId)) {
-            $account = Account::select('a_id', 'a_city', 'a_manager', 'a_manager_phone')->where('a_id', $districtId)->first();
-
-            return ['text' => $account->{$type}];
-        } else {
-            return ['text' => ''];
-        }
-    }
-
-    /**
      * 获取区域列表
      * @return array
      */
@@ -141,20 +123,6 @@ class AccountController
         $accounts = DB::select("select `a_id` as `id`, concat(`a_district`, '-', `a_city`) as `text` from `g_4357_accounts` ORDER BY `id`");
 
         return $accounts ? $accounts : $this->districts;
-    }
-
-    /**
-     * 获取某一个区域下的所有城市列表
-     * @param $id
-     * @return mixed
-     */
-    public function accountsCities($id)
-    {
-        $account = Account::select(DB::raw('a_id as id, a_city as text'))
-            ->where('a_id', $id)
-            ->get();
-
-        return $account;
     }
 
     /**

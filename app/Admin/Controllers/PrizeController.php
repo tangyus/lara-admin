@@ -138,10 +138,10 @@ class PrizeController extends Controller
         });
         $grid->p_apply_city('适用门店')->modal('适用门店', function () {
             $shops = Shop::find($this->p_apply_shop)->map(function ($item) {
-                return $item->only('s_name', 's_city');
+                return $item->only('s_name', 's_city', 's_address', 's_phone');
             });
 
-            return new Table(['门店名称', '门店城市'], $shops->toArray());
+            return new Table(['门店名称', '门店城市', '门店地址', '门店联系电话'], $shops->toArray());
         });
         $grid->p_point('兑换所需积分')->display(function () {
 			return (is_null($this->p_point) || $this->p_point == 0) ? '-' : $this->p_point;
@@ -176,6 +176,7 @@ class PrizeController extends Controller
             });
         });
 
+        $grid->disableCreateButton();
         $grid->disableRowSelector();
         if (Admin::user()->cannot('prizes.create')) {
             $grid->disableCreateButton();
@@ -238,10 +239,7 @@ class PrizeController extends Controller
     {
         $form = new Form(new Prize);
 
-        $prize = null;
-        if ($id) {
-            $prize = Prize::find($id);
-        }
+        $prize = Prize::find($id);
         if (Admin::user()->isRole('市场人员')) {
             $account = Account::where('a_account', Admin::user()->username)->first();
             $form->text('a_district', '区域')->default($account->a_district)->disable();
@@ -257,37 +255,29 @@ class PrizeController extends Controller
                 }
             });
         }
-        if ($prize) {
-            if ($prize->p_type == Prize::LEGEND_PRIZE) {
-                $form->text('p_name', '礼品名称')->disable();
-                $form->text('p_type', '礼品类型')->disable();
-                $form->text('p_number', '礼品数量')->disable();
-                $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->default(null)->disable();
-            } elseif ($prize->p_type == Prize::EXCHANGE_PRIZE) {
-                $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
-                $form->text('p_point', '兑换所需积分')->default(null)->disable();
-            }
-        }
-        if (!$prize || !in_array($prize->p_type, [Prize::EXCHANGE_PRIZE, Prize::LEGEND_PRIZE])) {
-            $form->text('p_name', '礼品名称')->rules('required', ['required' => '请输入礼品名称']);
-            $form->radio('p_type', '礼品类型')->options([
-                Prize::NEW_PRIZE => Prize::NEW_PRIZE,
-                Prize::ADVANCE_PRIZE => Prize::ADVANCE_PRIZE,
-                Prize::MEMBER_PRIZE => Prize::MEMBER_PRIZE,
-            ])->rules('required', ['required' => '请选择礼品类型']);
+        $form->text('p_name', '礼品名称')->disable();
+        $form->text('p_type', '礼品类型')->disable();
+        if ($prize && $prize->p_type == Prize::LEGEND_PRIZE) {
+            $form->text('p_number', '礼品数量')->disable();
+            $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->default(null)->disable();
+        } elseif ($prize && $prize->p_type == Prize::EXCHANGE_PRIZE) {
+            $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
+            $form->text('p_point', '兑换所需积分')->default(null)->disable();
+        } else {
             $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
         }
         $form->datetime('p_deadline', '领取截止时间')->placeholder('领取截止时间')->disable();
 
         $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
-            if (Admin::user()->isRole('市场人员')) {
-                $account = Account::where('a_account', Admin::user()->username)->first();
-                $query->where('s_account_id', $account->a_id);
-                $query->where('s_state', 0);
-            }
-        })
-        ->get()
-        ->pluck('s_name', 's_id'))->help('优惠券/新人礼/进阶礼/会员礼不需设定门店');
+                if (Admin::user()->isRole('市场人员')) {
+                    $account = Account::where('a_account', Admin::user()->username)->first();
+                    $query->where('s_account_id', $account->a_id);
+                    $query->where('s_state', 0);
+                }
+            })
+            ->get()
+            ->pluck('s_name', 's_id'))
+            ->help('优惠券/新人礼/进阶礼/会员礼/跑鞋不需设定门店');
         $form->text('p_phone_number', '活动热线')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
         $form->text('p_rule', '领取规则')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
         $form->switch('p_state', '是否停用')->states($this->states);

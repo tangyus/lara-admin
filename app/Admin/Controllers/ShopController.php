@@ -146,39 +146,12 @@ class ShopController extends Controller
                 });
                 return new Table(['区域', '城市', '区域负责人姓名', '区域负责人电话'], $info->toArray());
             });
-
-            // 数据查询过滤
-            $grid->filter(function ($filter) {
-                $filter->disableIdFilter();
-
-                $filter->column(1 / 2, function ($filter) {
-                    $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
-
-                    $filter->where(function ($query) {
-                        $query->whereHas('district', function ($query) {
-                            $query->where('a_city', $this->input);
-                        });
-                    }, '城市');
-                    $filter->where(function ($query) {
-                        $query->whereHas('district', function ($query) {
-                            $query->where('a_manager_phone', $this->input);
-                        });
-                    }, '区域负责人联系电话');
-                });
-                $filter->column(1 / 2, function ($filter) {
-                    $filter->equal('s_number', '门店序号');
-                    $filter->like('s_name', '门店名称');
-                    $filter->equal('s_manager_phone', '门店负责人电话');
-                });
-            });
-        } else {
-            $grid->disableFilter();
         }
         $grid->s_city('门店所在城市');
         $grid->s_number('门店序号');
         $grid->s_name('门店名称');
         $grid->s_phone('门店联系电话');
-        $grid->s_target('销售目标')->expand(function () {
+        $grid->s_target('销售目标')->modal(function () {
             return new Table(['月份', '销量目标', '实际销量'], [
                 0 => [6, $this->s_target_6, $this->s_sales_6],
                 1 => [7, $this->s_target_7, $this->s_sales_7],
@@ -197,6 +170,33 @@ class ShopController extends Controller
         }
         $grid->s_created('创建时间');
         $grid->s_updated('修改时间');
+
+        // 数据查询过滤
+        $grid->filter(function ($filter) {
+            $filter->disableIdFilter();
+            if (Admin::user()->inRoles(['administrator', '后台管理员'])) {
+                $filter->column(1 / 2, function ($filter) {
+                    $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
+
+                    $filter->where(function ($query) {
+                        $query->whereHas('district', function ($query) {
+                            $query->where('a_city', $this->input);
+                        });
+                    }, '城市');
+                    $filter->where(function ($query) {
+                        $query->whereHas('district', function ($query) {
+                            $query->where('a_manager_phone', $this->input);
+                        });
+                    }, '区域负责人联系电话');
+                });
+            }
+
+            $filter->column(1 / 2, function ($filter) {
+                $filter->equal('s_number', '门店序号');
+                $filter->like('s_name', '门店名称');
+                $filter->equal('s_manager_phone', '门店负责人电话');
+            });
+        });
 
         $grid->disableRowSelector();
         $grid->actions(function ($actions) {

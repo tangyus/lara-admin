@@ -13,6 +13,7 @@
 
 $router->get('create_codes', 'Controller@createCodes');
 $router->get('wx_codes', 'Controller@wxCode');
+$router->get('wx_codes_copy', 'Controller@wxCodeCopy');
 
 Route::group([
 	'prefix'    => 'api',
