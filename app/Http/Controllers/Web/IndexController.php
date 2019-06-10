@@ -92,10 +92,13 @@ class IndexController extends Controller
 
         try {
             $prizeCode = $request->input('code');
-            $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode, 'up_received' => 0])->first();
+            $userPrize = UserPrize::with(['prize', 'user'])->where(['up_code' => $prizeCode])->first();
             if (!$userPrize) {
-                return $this->responseFail('该奖品已核销或券码无效');
+                return $this->responseFail('该券码不存在');
             }
+			if ($userPrize->up_received == 1) {
+				return $this->responseFail('礼品已核销');
+			}
             if ($userPrize->prize->p_account_id != $this->shop->s_account_id) {
                 return $this->responseFail('该奖品不属于本区域核销');
             }
@@ -127,9 +130,12 @@ class IndexController extends Controller
         $number = $request->input('number');
         $password = $request->input('password');
 
-        if (($number != $this->shop->s_number) || ($password != $this->shop->s_password)) {
-            return $this->responseFail('门店序号或密码不正确!');
+        if ($number != $this->shop->s_number) {
+            return $this->responseFail('门店序号不正确!');
         }
+        if ($password != $this->shop->s_password) {
+			return $this->responseFail('门店核销密码不正确!');
+		}
 
         $userPrize = UserPrize::where(['up_id' => $id, 'up_received' => 0])->first();
         if ($userPrize) {
