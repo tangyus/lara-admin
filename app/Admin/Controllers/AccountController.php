@@ -217,23 +217,6 @@ class AccountController
             $form->text('a_district', '区域')->rules('required', ['required' => '请选择区域']);
             $form->text('a_city', '城市')->rules('required', ['required' => '请输入城市']);
             $form->text('a_account', '账号')->rules('required', ['required' => '请输入账号']);
-            // 添加后台登录账号和角色
-            $form->saved(function (Form $form) {
-                if (!empty($form->input('a_account'))) {
-                    $userId = DB::table('admin_users')->insertGetId([
-                        'username'      => $form->input('a_account'),
-                        'password'      => bcrypt($form->input('a_password')),
-                        'name'          => $form->input('a_district').$form->input('a_city').'市场人员',
-                        'created_at'    => Carbon::now(),
-                        'updated_at'    => Carbon::now(),
-                    ]);
-
-                    DB::table('admin_role_users')->insert([
-                        'role_id' => 3,
-                        'user_id' => $userId
-                    ]);
-                }
-            });
         }
         $form->text('a_manager', '区域负责人姓名')->rules('required', ['required' => '请输入区域负责人姓名']);
         $form->text('a_manager_phone', '区域联系电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
@@ -247,6 +230,26 @@ class AccountController
         $form->number('a_scan_times', '每个ID单日扫码最高次数')->default(0)->min(0);
         $form->number('a_lottery_times', '每个ID单日抽奖最高次数')->default(0)->min(0);
         $form->switch('a_state', '是否停用')->states($this->states);
+
+		// 添加后台登录账号和角色
+		$form->saving(function (Form $form) {
+			if (!empty($form->input('a_account'))) {
+				$userId = DB::table('admin_users')->insertGetId([
+					'username'      => $form->input('a_account'),
+					'password'      => bcrypt($form->input('a_password')),
+					'name'          => $form->input('a_district').$form->input('a_city').'市场人员',
+					'created_at'    => Carbon::now(),
+					'updated_at'    => Carbon::now(),
+				]);
+
+				DB::table('admin_role_users')->insert([
+					'role_id' => 3,
+					'user_id' => $userId
+				]);
+			} else {
+				DB::table('admin_users')->where('username', $form->model()->a_account)->update(['password' => bcrypt($form->input('a_password'))]);
+			}
+		});
 
         $form->tools(function ($tools) {
             $tools->disableDelete();

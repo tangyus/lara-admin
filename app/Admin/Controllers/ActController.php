@@ -49,6 +49,7 @@ class ActController extends Controller
         }
         $grid->p_id('ID');
         $grid->district()->a_district('区域');
+        $grid->district()->a_city('城市');
         $grid->p_type('礼品类型');
         $grid->p_name('礼品名称');
         $grid->p_number('礼品设置总量');
@@ -64,7 +65,9 @@ class ActController extends Controller
         $grid->filter(function ($filter){
             $filter->disableIdFilter();
             $filter->column(1 / 2, function ($filter) {
-                $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
+            	if (!Admin::user()->isRole('市场人员')) {
+					$filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
+				}
 
                 $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
             });

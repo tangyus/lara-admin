@@ -94,7 +94,7 @@ class QrcodeController extends Controller
 
         $grid->disableRowSelector();
         $grid->disableFilter();
-        $grid->disableActions();
+//        $grid->disableActions();
 
         if (Admin::user()->isRole('市场人员')) {
             $grid->actions(function ($actions) {
@@ -103,7 +103,7 @@ class QrcodeController extends Controller
                 $actions->disableView();
 
                 $row = $actions->row;
-//                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
+                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
             });
         } else {
             $grid->disableCreateButton();
@@ -146,9 +146,9 @@ class QrcodeController extends Controller
         $form->ignore('q_district');
 
         // 下载导出二维码
-//        $form->saved(function (Form $form) {
-//            $this->zipCodes($form->model());
-//        });
+        $form->saved(function (Form $form) {
+            $this->zipCodes($form->model());
+        });
 
         return $form;
     }

@@ -4,6 +4,7 @@ namespace App\Admin\Controllers;
 
 use App\Admin\Extensions\PointRecordExporter;
 use App\Admin\Extensions\UserExporter;
+use App\Admin\Extensions\UserPrizeExporter;
 use App\model\Account;
 use App\Model\PointRecord;
 use App\model\Prize;
@@ -328,6 +329,7 @@ class UserController extends Controller
     protected function userPrizeGrid()
     {
         $grid = new Grid(new UserPrize());
+        $grid->exporter(new UserPrizeExporter());
 
         $grid->model()->leftJoin('users', 'u_id', 'up_uid')
             ->leftJoin('prizes', 'p_id', 'up_prize_id')
@@ -376,7 +378,7 @@ class UserController extends Controller
 
         $grid->disableCreateButton();
         $grid->disableRowSelector();
-        $grid->disableExport();
+//        $grid->disableExport();
 
         // 数据查询过滤
         $grid->filter(function ($filter) {
