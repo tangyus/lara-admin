@@ -94,7 +94,7 @@ class QrcodeController extends Controller
 
         $grid->disableRowSelector();
         $grid->disableFilter();
-//        $grid->disableActions();
+        $grid->disableActions();
 
         if (Admin::user()->isRole('市场人员')) {
             $grid->actions(function ($actions) {
@@ -103,7 +103,7 @@ class QrcodeController extends Controller
                 $actions->disableView();
 
                 $row = $actions->row;
-                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
+//                $actions->append('<a href="'.$row->q_zip_path.'" target="_blank"><i class="fa fa-cloud-download">下载二维码</i></a>');
             });
         } else {
             $grid->disableCreateButton();
@@ -161,10 +161,9 @@ class QrcodeController extends Controller
     {
         $codes = Code::whereNull('c_qrcode_id')->orderBy('c_id', 'asc')->limit($model->q_number)->get();
         if (count($codes) > 0) {
-            $publicPath = public_path();
-            $path = $publicPath . '/download/codes';
+            $path = 'd:/download';
             $date = date('Ymd');
-            $zipPath = $path . "/{$date}_{$model->q_id}.zip";
+            $zipPath = $path . "/{$date}_{$model->q_city}_{$model->q_id}_{$model->q_number}.zip";
             $ids = [];
 
             $zip = new \ZipArchive();
@@ -173,13 +172,13 @@ class QrcodeController extends Controller
 //                    if (file_exists($publicPath . $codeFile->c_path)) {
                         // 将文件加入zip对象
                         $ids[] = $codeFile['c_id'];
-                        $zip->addFile($publicPath . '/' . $codeFile->c_path, $codeFile->c_filename);
+                        $zip->addFile('d:/' . $codeFile->c_path, $codeFile->c_filename);
 //                    }
                 }
                 $zip->close(); // 关闭处理的zip文件
                 Code::whereIn('c_id', $ids)->update(['c_qrcode_id' => $model->q_id]);
 
-                $model->q_zip_path = "/download/codes/{$date}_{$model->q_id}.zip";
+                $model->q_zip_path = "d:/download/{$date}_{$model->q_city}_{$model->q_id}_{$model->q_number}.zip";
                 $model->save();
             }
         }

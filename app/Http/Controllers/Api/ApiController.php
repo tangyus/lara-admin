@@ -176,81 +176,86 @@ class ApiController extends Controller
      */
 	public function info()
 	{
-		$user = Auth::user();
-		$userAll = User::where('u_openid', $user->u_openid)->get();
-		$cities = [];
-		if (count($userAll) > 1) {
-			foreach ($userAll as $item) {
-				if (!empty($item->u_city)) {
-					array_push($cities, $item->u_city);
-				}
-			}
-		}
+	    try {
+            $user = Auth::user();
+            $userAll = User::where('u_openid', $user->u_openid)->get();
+            $cities = [];
+            if (count($userAll) > 1) {
+                foreach ($userAll as $item) {
+                    if (!empty($item->u_city)) {
+                        array_push($cities, $item->u_city);
+                    }
+                }
+            }
 
-		// 活动规则
-        $rule = Rule::first();
+            // 活动规则
+            $rule = Rule::first();
 
-        // 新人奖
-        $newPrize = PointRecord::where(['pr_prize_type' => Prize::NEW_PRIZE, 'pr_uid' => $user->u_id])->first();
-        if (!$newPrize) {
-            $newPrize = 0;
-        } else {
-            $newPrize = ($newPrize->pr_received == 0) ? 1 : 2;
+            // 新人奖
+            $newPrize = PointRecord::where(['pr_prize_type' => Prize::NEW_PRIZE, 'pr_uid' => $user->u_id])->first();
+            if (!$newPrize) {
+                $newPrize = 0;
+            } else {
+                $newPrize = ($newPrize->pr_received == 0) ? 1 : 2;
+            }
+
+            // 进阶奖
+            $advancePrizeData = PointRecord::where(['pr_prize_type' => Prize::ADVANCE_PRIZE, 'pr_uid' => $user->u_id])->first();
+            $dateArr = [];
+            if (!$advancePrizeData) {
+                $advancePrize = 0;
+                // 判断是否有进阶礼资格
+                $firstDay = strtotime('today') + 86400;
+                $lastDay = $firstDay - 86400 * 14;
+                $lastDate = date('Y-m-d H:i:s', $lastDay);
+                $firstDate = date('Y-m-d H:i:s', $firstDay);
+                $dateArr = [];
+                PointRecord::where(['pr_prize_type' => Prize::MEMBER_PRIZE, 'pr_uid' => $user->u_id])
+                    ->whereRaw("pr_created > '$lastDate' and pr_created < '$firstDate'")
+                    ->orderBy('pr_created', 'asc')
+                    ->get()
+                    ->map(function ($item) use (&$dateArr) {
+                        $dateKey = date('Y-m-d', strtotime($item->pr_created));
+                        if (!in_array($dateKey, $dateArr)) {
+                            $dateArr[] = $dateKey;
+                        }
+                    });
+                if (count($dateArr) >= 7) {
+                    // 任意2周时间段内扫码7天，获得进阶礼
+                    PointRecord::insert((new PointRecord())->setAttributes(Prize::ADVANCE_PRIZE, Prize::ADVANCE_PRIZE, 0, 35, $user->u_current_point + 35));
+                    $advancePrize = 1;
+                }
+            } else {
+                $advancePrize = ($advancePrizeData->pr_received == 0) ? 1 : 2;
+            }
+            $account = Account::find($user->u_account_id);
+            $count = DB::table('lottery_logs')->where(['ll_uid' => $user->u_id, 'll_day' => strtotime('today')])->count();
+
+            return $this->responseSuccess([
+                'user' 	=> [
+                    'nick' 			=> $user->u_nick,
+                    'headimg' 		=> $user->u_headimg,
+                    'phone' 		=> $user->u_phone,
+                    'currentPoint' 	=> $user->u_current_point,
+                    'currentCity'  	=> $user->u_city,
+                    'newPrize'      => $newPrize,
+                    'advancePrize'  => $advancePrize,
+                    'dateArr'       => $dateArr,
+                    'mainRuleImg'   => $rule ? $rule->r_act_img : '',
+                    'pointRuleImg'  => $rule ? $rule->r_rule_img : '',
+                    'legendRuleImg' => $rule ? $rule->r_point_img : '',
+                    'hasScanCode'   => !empty($user->u_city) ? 1 : 0,
+                    'todayCanLotteryCount' => ($account && $account->a_lottery_times - $count >= 0)? ($account->a_lottery_times - $count) : 0,
+                    'hotLine'       => $account ? $account->a_hot_line : '',
+                    'workTime'      => $account ? $account->a_work_time : '',
+                    'sponsor'       => $account ? $account->a_sponsor : ''
+                ],
+                'cities' => $cities
+            ]);
+        } catch (\Exception $e) {
+            return $this->responseFail($e->getMessage());
         }
 
-		// 进阶奖
-		$advancePrizeData = PointRecord::where(['pr_prize_type' => Prize::ADVANCE_PRIZE, 'pr_uid' => $user->u_id])->first();
-		$dateArr = [];
-		if (!$advancePrizeData) {
-			$advancePrize = 0;
-			// 判断是否有进阶礼资格
-			$firstDay = strtotime('today') + 86400;
-			$lastDay = $firstDay - 86400 * 14;
-			$lastDate = date('Y-m-d H:i:s', $lastDay);
-			$firstDate = date('Y-m-d H:i:s', $firstDay);
-			$dateArr = [];
-			PointRecord::where(['pr_prize_type' => Prize::MEMBER_PRIZE, 'pr_uid' => $user->u_id])
-				->whereRaw("pr_created > '$lastDate' and pr_created < '$firstDate'")
-				->orderBy('pr_created', 'asc')
-				->get()
-				->map(function ($item) use (&$dateArr) {
-					$dateKey = date('Y-m-d', strtotime($item->pr_created));
-					if (!in_array($dateKey, $dateArr)) {
-						$dateArr[] = $dateKey;
-					}
-				});
-			if (count($dateArr) >= 7) {
-				// 任意2周时间段内扫码7天，获得进阶礼
-				PointRecord::insert((new PointRecord())->setAttributes(Prize::ADVANCE_PRIZE, Prize::ADVANCE_PRIZE, 0, 35, $user->u_current_point + 35));
-				$advancePrize = 1;
-			}
-		} else {
-            $advancePrize = ($advancePrizeData->pr_received == 0) ? 1 : 2;
-		}
-        $account = Account::find($user->u_account_id);
-        $count = DB::table('lottery_logs')->where(['ll_uid' => $user->u_id, 'll_day' => strtotime('today')])->count();
-
-		return $this->responseSuccess([
-			'user' 	=> [
-				'nick' 			=> $user->u_nick,
-				'headimg' 		=> $user->u_headimg,
-				'phone' 		=> $user->u_phone,
-				'currentPoint' 	=> $user->u_current_point,
-				'currentCity'  	=> $user->u_city,
-                'newPrize'      => $newPrize,
-                'advancePrize'  => $advancePrize,
-                'dateArr'       => $dateArr,
-                'mainRuleImg'   => $rule ? $rule->r_act_img : '',
-                'pointRuleImg'  => $rule ? $rule->r_rule_img : '',
-                'legendRuleImg' => $rule ? $rule->r_point_img : '',
-                'hasScanCode'   => !empty($user->u_city) ? 1 : 0,
-                'todayCanLotteryCount' => ($account && $account->a_lottery_times - $count >= 0)? ($account->a_lottery_times - $count) : 0,
-                'hotLine'       => $account->a_hot_line,
-                'workTime'      => $account->a_work_time,
-                'sponsor'       => $account->a_sponsor
-			],
-			'cities' => $cities
-		]);
 	}
 
     /**

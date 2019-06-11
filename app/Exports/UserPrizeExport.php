@@ -29,7 +29,7 @@ class UserPrizeExport implements FromArray
             ->get()
             ->map(function ($item) use (&$data) {
                 $data[] = [
-                    !empty($item->user->u_nick) ? $item->user->u_nick : '测试',
+                    !empty($item->user->u_nick) ? $item->user->u_nick : '',
                     $item->user ? $item->user->u_phone : '',
                     $item->prize->p_type,
                     $item->prize->p_name,

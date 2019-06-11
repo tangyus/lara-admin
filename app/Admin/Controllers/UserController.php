@@ -18,7 +18,6 @@ use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
 use Encore\Admin\Widgets\Table;
 use Illuminate\Http\Request;
-use Illuminate\Support\MessageBag;
 
 class UserController extends Controller
 {
@@ -222,6 +221,7 @@ class UserController extends Controller
     {
         $grid = new Grid(new PointRecord());
         $grid->exporter(new PointRecordExporter());
+
         $grid->model()->where('pr_received', 1)
             ->leftJoin('users', 'u_id', 'pr_uid')
 			->leftJoin('accounts', 'a_id', 'u_account_id')
@@ -255,17 +255,19 @@ class UserController extends Controller
 
             $filter->column(1 / 2, function ($filter) {
                 // 关联关系查询
-                $filter->where(function ($query) {
-                    $query->whereHas('user', function ($query) {
-                        $query->where('u_phone', $this->input);
-                    });
-                }, '用户手机号');
+                $filter->equal('u_phone', '用户手机号');
+//                $filter->where(function ($query) {
+//                    $query->whereHas('user', function ($query) {
+//                        $query->where('u_phone', $this->input);
+//                    });
+//                }, '用户手机号');
                 if (!Admin::user()->isRole('市场人员')) {
-                    $filter->where(function ($query) {
-                        $query->whereHas('user', function ($query) {
-                            $query->where('u_account_id', $this->input);
-                        });
-                    }, '用户区域')->select('/admin/accounts_list');
+                    $filter->equal('u_account_id', '用户区域')->select('/admin/accounts_list');
+//                    $filter->where(function ($query) {
+//                        $query->whereHas('user', function ($query) {
+//                            $query->where('u_account_id', $this->input);
+//                        });
+//                    }, '用户区域')->select('/admin/accounts_list');
                 }
 
                 $filter->between('pr_created', '时间')->datetime();
@@ -384,6 +386,8 @@ class UserController extends Controller
         $grid->filter(function ($filter) {
             $filter->disableIdFilter();
             $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
+            $filter->equal('up_received', '是否核销')->select([0 => '未核销', 1 => '已核销']);
+            $filter->equal('up_shop_id', '核销门店')->select('/admin/shops_list');
         });
         $grid->disableActions();
 

@@ -32,6 +32,14 @@ class AccountExporter extends ExcelExporter implements WithStrictNullComparison
 
     public function query()
     {
-        return Account::query()->select(array_keys($this->columns));
+        return Account::query()
+            ->where(function ($query) {
+                foreach (request()->input() as $key => $value) {
+                    if (!empty($value) && in_array($key, array_keys($this->columns))) {
+                        $query->where($key, $value);
+                    }
+                }
+            })
+            ->select(array_keys($this->columns));
     }
 }

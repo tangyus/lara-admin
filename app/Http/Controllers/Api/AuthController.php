@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 
 use App\Http\Controllers\Controller;
+use App\Model\Stats;
 use App\Model\User;
 use EasyWeChat\Factory;
 use Illuminate\Http\Request;
@@ -15,7 +16,6 @@ class AuthController extends Controller
      * 用户授权
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
-     * @throws \EasyWeChat\Kernel\Exceptions\InvalidConfigException
      */
 	public function auth(Request $request)
 	{
@@ -26,47 +26,51 @@ class AuthController extends Controller
 			return $this->responseSuccess(Auth::user()->u_token);
 		}
 
-		$app = Factory::miniProgram(config('miniprogram'));
-		$response = $app->auth->session($code);
-        if (!empty($response['openid'])) {
-            // access_token 需确保数据库唯一
-            $token = sha1($response['session_key'] . uniqid() . time());
-            $expired = time() + 7000;
+		try {
+            $app = Factory::miniProgram(config('miniprogram'));
+            $response = $app->auth->session($code);
+            if (!empty($response['openid'])) {
+                // access_token 需确保数据库唯一
+                $token = sha1($response['session_key'] . uniqid() . time());
+                $expired = time() + 7000;
 
-            // 3. 判断 openID 对应用户是否存在
-            $user = User::where('u_openid', $response['openid'])->first();
-            if ($user) {
-            	$where = ['u_openid' => $response['openid']];
-            	if (Auth::user()) {
-					$where = array_merge($where, ['u_id' => Auth::id()]);
-				}
-                // 存在则更新 token
-                User::where($where)->update([
-                    'u_sessionkey'  => $response['session_key'],
-                    'u_token'       => $token,
-                    'u_expired'     => $expired,
-                ]);
+                // 3. 判断 openID 对应用户是否存在
+                $user = User::where('u_openid', $response['openid'])->first();
+                if ($user) {
+                    $where = ['u_openid' => $response['openid']];
+                    if (Auth::user()) {
+                        $where = array_merge($where, ['u_id' => Auth::id()]);
+                    }
+                    // 存在则更新 token
+                    User::where($where)->update([
+                        'u_sessionkey'  => $response['session_key'],
+                        'u_token'       => $token,
+                        'u_expired'     => $expired,
+                    ]);
+                } else {
+                    // 新用户，插入用户信息
+                    $attribute = [
+                        'u_openid'          => $response['openid'],
+                        'u_sessionkey'      => $response['session_key'], // 这个需要存储在数据库，后面解密用户信息需要使用
+                        'u_token'           => $token,
+                        'u_expired'         => $expired,
+                        'u_ip'              => $request->ip(),
+                    ];
+                    $user = User::create($attribute);
+                    Stats::insert([
+                        's_time'        => strtotime('today'),
+                        's_type'        => 'uv',
+                        's_account_id'  => null,
+                        's_uid'         => $user->u_id
+                    ]);
+                }
+
+                return $this->responseSuccess($token);
             } else {
-                // 新用户，插入用户信息
-                $attribute = [
-                    'u_openid'          => $response['openid'],
-                    'u_sessionkey'      => $response['session_key'], // 这个需要存储在数据库，后面解密用户信息需要使用
-                    'u_token'           => $token,
-                    'u_expired'         => $expired,
-                    'u_ip'              => $request->ip(),
-                ];
-                $user = User::create($attribute);
-                Stats::insert([
-                    's_time'        => strtotime('today'),
-                    's_type'        => 'uv',
-                    's_account_id'  => null,
-                    's_uid'         => $user->u_id
-                ]);
+                return $this->responseFail($response['errmsg']);
             }
-
-            return $this->responseSuccess($token);
-        } else {
-            return $this->responseFail($response['errmsg']);
+        } catch (\Exception $e) {
+            return $this->responseFail($e->getMessage());
         }
 	}
 

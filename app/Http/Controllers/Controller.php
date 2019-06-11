@@ -114,7 +114,7 @@ class Controller extends BaseController
                 $i++;
             }
         }
-        dd($i);
+        return ['count' => $i];
     }
 
     public function wxCodeCopy()
@@ -135,7 +135,7 @@ class Controller extends BaseController
         ];
         $app = Factory::miniProgram($config);
 
-        $codes = Code::where('c_id', '>', '100000')->whereNull('c_path')->limit(10)->get();
+        $codes = Code::where('c_id', '>=', '250000')->where('c_id', '<=', '300000')->whereNull('c_path')->limit(10)->get();
         $i = 0;
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
@@ -152,6 +152,6 @@ class Controller extends BaseController
                 $i++;
             }
         }
-        dd($i);
+        return ['count' => $i];
     }
 }

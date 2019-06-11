@@ -36,6 +36,11 @@ class QrcodeExporter extends ExcelExporter
 					$account = Account::where('a_account', Admin::user()->username)->first();
 					$query->where('q_account_id', $account->a_id);
 				}
+                foreach (request()->input() as $key => $value) {
+                    if (!empty($value) && in_array($key, array_keys($this->columns))) {
+                        $query->where($key, $value);
+                    }
+                }
 			})
 			->select(array_keys($this->columns));
     }
