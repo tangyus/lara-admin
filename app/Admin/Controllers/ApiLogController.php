@@ -36,11 +36,15 @@ class ApiLogController extends Controller
     {
         $grid = new Grid(new ApiLog());
 
-        $grid->model()->leftJoin('users', 'u_id', 'user_id')->orderBy('id', 'DESC');
+        $grid->model()->leftJoin('users', 'u_id', 'user_id')
+            ->leftJoin('shops', 's_id', 'shop_id')
+            ->orderBy('id', 'DESC');
 
         $grid->id('ID')->sortable();
         $grid->u_nick('用户昵称');
         $grid->u_phone('手机号');
+        $grid->s_number('门店编号');
+        $grid->s_name('门店名');
         $grid->method('方法名')->display(function ($method) {
             return "<span class=\"badge bg-grey\">$method</span>";
         });

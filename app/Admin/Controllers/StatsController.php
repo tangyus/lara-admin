@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\model\Account;
 use App\Model\Stats;
 use Encore\Admin\Facades\Admin;
+use Encore\Admin\Form\Tools;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Widgets\Box;
@@ -28,6 +29,7 @@ class StatsController extends Controller
 
     protected function grid()
     {
+        // Gatorade&*159  0WxWsmII627pGaeU
         $grid = new Grid(new Stats());
         $grid->exporter(new StatsExporter());
         $grid->model()->select(DB::raw('count(s_id) as count, s_time'))->where('s_id', 0);
@@ -64,7 +66,7 @@ class StatsController extends Controller
         $uvData = [];
         $pvData = [];
         Stats::select(DB::raw('count(s_id) as count, s_time, s_type'))
-            ->where(function ($query) {
+            ->where(function ($query) use (&$labels, &$pvData, &$uvData) {
                 if (Admin::user()->isRole('市场人员')) {
                     // 修改数据来源
                     $account = Account::where('a_account', Admin::user()->username)->first();
@@ -74,10 +76,21 @@ class StatsController extends Controller
                 }
                 if (request()->get('s_time')) {
                     $times = request()->get('s_time');
-                    $query->whereBetween('s_time', [
-                        $times['start'] ? strtotime($times['start']) : strtotime('-1 day'),
-                        $times['end'] ? strtotime($times['end']) : strtotime('+1 day')
-                    ]);
+                    $start = !empty($times['start']) ? strtotime($times['start']) : strtotime('-15 day');
+                    $end = !empty($times['end']) ? strtotime($times['end']) : strtotime('+15 day');
+                } else {
+                    $start = strtotime('-15 day');
+                    $end = strtotime('+15 day');
+                }
+                $query->whereBetween('s_time', [$start, $end]);
+
+                $i = $start;
+                while ($i <= $end) {
+                    $day = date('m-d', $i);
+                    $labels[] = $day;
+                    $pvData[$day] = 0;
+                    $uvData[$day] = 0;
+                    $i = $i + 86400;
                 }
             })
             ->groupBy('s_time')
@@ -85,13 +98,10 @@ class StatsController extends Controller
             ->get()
             ->map(function ($item) use (&$labels, &$pvData, &$uvData) {
                 $day = date('m-d', $item['s_time']);
-                if (!in_array($day, $labels)) {
-                    $labels[] = date('m-d', $item['s_time']);
-                }
                 if ($item['s_type'] == 'pv') {
-                    $pvData[] = $item['count'];
+                    $pvData[$day] = $item['count'];
                 } else {
-                    $uvData[] = $item['count'];
+                    $uvData[$day] = $item['count'];
                 }
             });
 

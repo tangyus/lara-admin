@@ -14,6 +14,7 @@ class AccountExporter extends ExcelExporter implements WithStrictNullComparison
     protected $fileName = '区域账号.csv';
 
     protected $columns = [
+        'a_id'              => 'ID',
         'a_district'        => '区域',
         'a_city'            => '城市',
         'a_manager'         => '区域负责人姓名',
@@ -35,7 +36,7 @@ class AccountExporter extends ExcelExporter implements WithStrictNullComparison
         return Account::query()
             ->where(function ($query) {
                 foreach (request()->input() as $key => $value) {
-                    if (!empty($value) && in_array($key, array_keys($this->columns))) {
+                    if (!empty($value) && !in_array($key, ['_pjax', '_export_', 'per_page'])) {
                         $query->where($key, $value);
                     }
                 }

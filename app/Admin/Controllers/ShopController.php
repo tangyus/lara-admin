@@ -131,11 +131,14 @@ class ShopController extends Controller
     protected function grid()
     {
         $grid = new Grid(new Shop);
-        if (Admin::user()->isRole('市场人员')) {
-            // 修改数据来源
-            $account = Account::where('a_account', Admin::user()->username)->first();
-            $grid->model()->where('s_account_id', $account->a_id);
-        }
+        $grid->model()->leftJoin('accounts', 's_account_id', 'a_id')
+            ->where(function ($query) {
+                if (Admin::user()->isRole('市场人员')) {
+                    // 修改数据来源
+                    $account = Account::where('a_account', Admin::user()->username)->first();
+                    $query->where('s_account_id', $account->a_id);
+                }
+            });
         $grid->exporter(new ShopExporter());
 
         $grid->s_id('ID');
@@ -178,16 +181,18 @@ class ShopController extends Controller
                 $filter->column(1 / 2, function ($filter) {
                     $filter->equal('s_account_id', '区域')->select('/admin/accounts_list');
 
-                    $filter->where(function ($query) {
-                        $query->whereHas('district', function ($query) {
-                            $query->where('a_city', $this->input);
-                        });
-                    }, '城市');
-                    $filter->where(function ($query) {
-                        $query->whereHas('district', function ($query) {
-                            $query->where('a_manager_phone', $this->input);
-                        });
-                    }, '区域负责人联系电话');
+                    $filter->equal('a_city', '城市');
+//                    $filter->where(function ($query) {
+//                        $query->whereHas('district', function ($query) {
+//                            $query->where('a_city', $this->input);
+//                        });
+//                    }, '城市');
+                    $filter->equal('a_manager_phone', '区域负责人联系电话');
+//                    $filter->where(function ($query) {
+//                        $query->whereHas('district', function ($query) {
+//                            $query->where('a_manager_phone', $this->input);
+//                        });
+//                    }, '区域负责人联系电话');
                 });
             }
 
@@ -265,22 +270,22 @@ class ShopController extends Controller
         } else {
             if (Admin::user()->isRole('市场人员')) {
                 $account = Account::where('a_account', Admin::user()->username)->first();
-                $form->text('s_district', '区域')->default($account->a_district)->disable();
-                $shopCount = Shop::where('s_account_id', $account->a_id)->count();
+                $lastShop = Shop::where('s_account_id', $account->a_id)->orderBy('s_id', 'desc')->first();
+				$prefix = $account->a_account;
+				if ($lastShop) {
+                    $count = intval(substr($lastShop->s_number, strripos($lastShop->s_number, '0') + 1)) + 1;
+                } else {
+				    $count = 1;
+                }
 
-                $number = pinyin($account->a_district).'-'.pinyin($account->a_city).str_pad($shopCount + 1, 6, '0', STR_PAD_LEFT);
+                $number = $prefix.str_pad($count, 6, '0', STR_PAD_LEFT);
+                $form->text('s_district', '区域')->default($account->a_district)->disable();
                 $form->text('s_city', '城市')->default($account->a_city)->disable();
                 $form->text('s_number', '门店序号')->default($number)->disable();
 
-                $form->hidden('s_account_id');
-                $form->hidden('s_city');
-                $form->hidden('s_number');
-
-                $form->saving(function (Form $form) use ($account, $number) {
-                    $form->input('s_account_id', $account->a_id);
-                    $form->input('s_city', $account->a_city);
-                    $form->input('s_number', $number);
-                });
+                $form->hidden('s_account_id')->value($account->a_id);
+                $form->hidden('s_city')->value($account->a_city);
+                $form->hidden('s_number')->value($number);
             } else {
                 $form->select('s_account_id', '区域')->options('/admin/accounts_list')->rules('required', ['required' => '请选择区域']);
                 $form->text('s_number', '门店序号')->rules('required', ['required' => '请输入门店序号']);

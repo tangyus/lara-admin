@@ -41,6 +41,7 @@ Route::group([
 		// 兑换
         $router->post('exchange_prize', 'ApiController@exchangePrizes');
         $router->post('exchange', 'ApiController@exchange');
+        $router->post('cancel_exchange', 'ApiController@cancelExchange');
         $router->post('user_exchange_prize', 'ApiController@userExchangePrizeList');
 	});
 });

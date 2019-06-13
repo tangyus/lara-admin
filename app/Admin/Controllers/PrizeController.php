@@ -151,7 +151,7 @@ class PrizeController extends Controller
 		});
         $grid->p_number('礼品数量');
         $grid->p_current_number('剩余数量(总量-已核销)')->display(function () {
-        	return $this->p_number - $this->p_used_number;
+        	return ($this->p_number - $this->p_used_number);
 		});
         if (Admin::user()->cannot('prizes.create')) {
             $grid->p_state('是否停用')->using(['否', '是']);
@@ -169,7 +169,7 @@ class PrizeController extends Controller
                 if (!Admin::user()->isRole('市场人员')) {
                     $filter->equal('p_account_id', '区域')->select('/admin/accounts_list');
                 }
-                $filter->like('p_name', '礼品名称');
+                $filter->equal('p_name', '礼品名称');
             });
             $filter->column(1 / 2, function ($filter) {
                 $filter->equal('p_type', '礼品类型')->select((new Prize())->prizeType);
@@ -258,17 +258,17 @@ class PrizeController extends Controller
         $form->text('p_name', '礼品名称')->disable();
         $form->text('p_type', '礼品类型')->disable();
         if ($prize && $prize->p_type == Prize::LEGEND_PRIZE) {
-            $form->text('p_number', '礼品数量')->disable();
+            $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
             $form->rate('p_rate', '中奖概率')->setWidth(2, 2)->default(null)->disable();
         } elseif ($prize && $prize->p_type == Prize::EXCHANGE_PRIZE) {
             $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
             $form->text('p_point', '兑换所需积分')->default(null)->disable();
         } else {
-            $form->text('p_number', '礼品数量')->rules('required', ['required' => '请输入礼品数量']);
+            $form->text('p_number', '礼品数量')->disable();
         }
         $form->datetime('p_deadline', '领取截止时间')->placeholder('领取截止时间')->disable();
 
-        $form->multipleSelect('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
+        $form->listbox('p_apply_shop', '适用门店')->options(Shop::where(function ($query) {
                 if (Admin::user()->isRole('市场人员')) {
                     $account = Account::where('a_account', Admin::user()->username)->first();
                     $query->where('s_account_id', $account->a_id);

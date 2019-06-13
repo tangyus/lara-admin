@@ -36,8 +36,12 @@ class PointRecordExporter extends ExcelExporter
 					$query->where('u_account_id', $account->a_id);
 				}
                 foreach (request()->input() as $key => $value) {
-                    if (!empty($value) && in_array($key, array_keys($this->columns))) {
-                        $query->where($key, $value);
+                    if (!empty($value) && !in_array($key, ['_pjax', '_export_', 'per_page'])) {
+                        if ($key == 'pr_created') {
+                            $query->whereBetween('pr_created', [$value['start'], $value['end']]);
+                        } else {
+                            $query->where($key, $value);
+                        }
                     }
                 }
                 $query->where('pr_received', 1);

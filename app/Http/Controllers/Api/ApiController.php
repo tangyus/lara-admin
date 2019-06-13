@@ -29,7 +29,7 @@ class ApiController extends Controller
             's_time'        => strtotime('today'),
             's_type'        => 'pv',
             's_account_id'  => $user ? $user->u_account_id : null,
-            's_uid'         => $user ? $user->u_account_id : null
+            's_uid'         => $user ? $user->u_id : null
         ]);
 
         return $this->responseSuccess(1);
@@ -60,7 +60,7 @@ class ApiController extends Controller
                 ->where(['c_code' => $code])
                 ->first();
             if (!$codeInfo || $codeInfo->c_used != 0) {
-                if ($codeInfo && empty($user->u_city)) {
+                if ($codeInfo && empty($user->u_account_id)) {
                     User::where('u_id', Auth::id())->update([
                         'u_city'            => $codeInfo->q_city,
                         'u_account_id'      => $codeInfo->q_account_id,
@@ -83,7 +83,7 @@ class ApiController extends Controller
                 }
             }
             if (time() > strtotime($codeInfo->q_expired)) {
-                if (!empty($user->u_account_id)) {
+                if (empty($user->u_account_id)) {
                     User::where('u_id', Auth::id())->update([
                         'u_city'            => $codeInfo->q_city,
                         'u_account_id'      => $codeInfo->q_account_id,
@@ -122,6 +122,12 @@ class ApiController extends Controller
                         'u_total_point'     => 0,
                         'u_ip'              => $request->ip()
                     ]));
+                    Stats::insert([
+                        's_time'        => strtotime('today'),
+                        's_type'        => 'uv',
+                        's_account_id'  => $codeInfo->q_account_id,
+                        's_uid'         => Auth::id()
+                    ]);
                 }
                 $user = Auth::user();
             }
@@ -146,6 +152,7 @@ class ApiController extends Controller
             $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, '产品购买', 1, $qPoint, $user->u_current_point + $qPoint);
             // 判断是否为会员日
             if ($isDayOfWeek) {
+                Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::MEMBER_PRIZE])->increment('p_receive_number');
                 $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, Prize::MEMBER_PRIZE, 1, $qPoint, $user->u_current_point + $qPoint * 2);
             }
             // 增加积分记录
@@ -299,8 +306,8 @@ class ApiController extends Controller
 				$query->where('pr_received', 1);
 				$query->where('pr_point', ($type == 1) ? '>' : '<', 0);
 			})
-			->orderBy('pr_updated', 'asc')
 			->select(DB::raw('pr_id, pr_point, pr_current_point, pr_updated, pr_prize_type, pr_prize_name'))
+            ->orderBy('pr_updated', 'desc')
 			->offset(($page - 1) * $pageSize)
 			->limit($pageSize)
 			->get()
@@ -467,7 +474,7 @@ class ApiController extends Controller
             // 中奖奖品
             $prize = $prizeList[$result];
 			if ($prize->p_type_id == 7) {
-                $userPrizeOfShoe = UserPrize::where(['up_prize_id' => $prize->p_id, 'up_openid' => $user->u_openid])->first();
+                $userPrizeOfShoe = UserPrize::where(['up_openid' => $user->u_openid])->first();
                 if ($userPrizeOfShoe) {
                     // 已经中过跑鞋，则默认中饮品
                     $prize = $prizeList[0];
@@ -497,7 +504,7 @@ class ApiController extends Controller
                 DB::table('coupon_codes')->where('cc_id', $couponCode->cc_id)->update(['cc_used' => 1, 'cc_up_id' => $userPrize->up_id]);
             }
 
-            Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::LEGEND_PRIZE])->increment('p_receive_number');
+            Prize::where(['p_id' => $prize->p_id])->increment('p_receive_number');
             $data = [
                 'name'          => $prize->p_name,
                 'img'           => $prize->p_img,
@@ -670,18 +677,18 @@ class ApiController extends Controller
 
             $codeStr = date('His').mt_rand(1000, 9999);
             // 插入用户中奖数据
-            UserPrize::create([
+            $userPrize = UserPrize::create([
                 'up_uid'        => $user->u_id,
                 'up_type'       => '兑换',
                 'up_prize_id'   => $prize->p_id,
                 'up_code'       => $codeStr
             ]);
 
-            Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::EXCHANGE_PRIZE])->increment('p_receive_number');
+            Prize::where(['p_id' => $id])->increment('p_receive_number');
 
             DB::commit();
             $data = [
-                'id'            => $prize->p_id,
+                'id'            => $userPrize->up_id,
                 'name'          => $prize->p_name,
                 'img'           => $prize->p_img,
                 'point'         => $prize->p_point,
@@ -703,6 +710,43 @@ class ApiController extends Controller
                     $data['shops'][] = $item;
                 });
 			return $this->responseSuccess(['pointIsNotEnough' => 0, 'data' => $data]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return $this->responseFail($e->getMessage());
+        }
+    }
+
+    /**
+     * 取消兑换
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function cancelExchange()
+    {
+        $id = \request()->input('id');
+        $userPrize = UserPrize::where(['up_id' => $id, 'up_uid' => Auth::id()])->first();
+        if ($userPrize->up_received != 0) {
+            return $this->responseFail('该礼品已核销，无法取消');
+        }
+
+        DB::beginTransaction();
+        $user = Auth::user();
+        try {
+            $prize = Prize::where('p_id', $userPrize->up_prize_id)->first();
+            $prize->p_receive_number = $prize->p_receive_number - 1;
+            $prize->save();
+
+            // 增加积分
+            $user->u_current_point = $user->u_current_point + $prize->p_point;
+            $user->save();
+
+            $userPrize->delete();
+
+            $pointRecord = new PointRecord();
+            $attribute = $pointRecord->setAttributes(Prize::EXCHANGE_PRIZE, '闪电积分礼-取消兑换', 1, $prize->p_point, $user->u_current_point);
+            $pointRecord->insert($attribute);
+
+            DB::commit();
+            return $this->responseSuccess($user->u_current_point);
         } catch (\Exception $e) {
             DB::rollback();
             return $this->responseFail($e->getMessage());

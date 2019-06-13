@@ -37,7 +37,7 @@ class QrcodeExporter extends ExcelExporter
 					$query->where('q_account_id', $account->a_id);
 				}
                 foreach (request()->input() as $key => $value) {
-                    if (!empty($value) && in_array($key, array_keys($this->columns))) {
+                    if (!empty($value) && !in_array($key, ['_pjax', '_export_', 'per_page'])) {
                         $query->where($key, $value);
                     }
                 }

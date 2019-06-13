@@ -8,4 +8,6 @@ class Stats extends Model
 {
     protected $table = 'stats';
     protected $primaryKey = 's_id';
+
+    public $timestamps = false;
 }

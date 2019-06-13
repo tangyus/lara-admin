@@ -32,11 +32,13 @@ class StatsExporter extends ExcelExporter
                 }
                 if (request()->get('s_time')) {
                     $times = request()->get('s_time');
-                    $query->whereBetween('s_time', [
-                        $times['start'] ? strtotime($times['start']) : strtotime('-1 day'),
-                        $times['end'] ? strtotime($times['end']) : strtotime('+1 day')
-                    ]);
+                    $start = !empty($times['start']) ? strtotime($times['start']) : strtotime('-1 day');
+                    $end = !empty($times['end']) ? strtotime($times['end']) : strtotime('+1 day');
+                } else {
+                    $start = strtotime('-15 day');
+                    $end = strtotime('+15 day');
                 }
+                $query->whereBetween('s_time', [$start, $end]);
             })
             ->orderBy('s_type', 'asc')
             ->orderBy('s_time', 'asc')

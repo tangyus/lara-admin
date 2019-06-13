@@ -74,6 +74,34 @@ class Controller extends BaseController
         }
     }
 
+    public function test()
+    {
+        $config = [
+            'app_id' => 'wx82de84528e164c9b',
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47',
+
+            // 下面为可选项
+            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
+            'response_type' => 'array',
+
+            'log' => [
+                'driver' => 'daily',
+                'level' => 'info',
+                'file' => public_path() . '/wechat.log',
+            ],
+        ];
+        $app = Factory::miniProgram($config);
+        $response = $app->app_code->getUnlimit('SDBJJFYL_', [
+            'page'  => 'Pages/Index/Index',
+            'width' => 280,
+        ]);
+        if ($response instanceof StreamResponse) {
+            $filename = 'demo.jpg';
+            $response->saveAs(public_path(), $filename);
+        }
+        dd(1);
+    }
+
     /**
      * 生成小程序码
      * @throws \EasyWeChat\Kernel\Exceptions\InvalidArgumentException
@@ -97,7 +125,7 @@ class Controller extends BaseController
         ];
         $app = Factory::miniProgram($config);
 
-        $codes = Code::whereNull('c_path')->limit(10)->get();
+        $codes = Code::whereNull('c_path')->where('c_id', '>', '330000')->limit(10)->get();
         $i = 0;
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
@@ -135,7 +163,7 @@ class Controller extends BaseController
         ];
         $app = Factory::miniProgram($config);
 
-        $codes = Code::where('c_id', '>=', '250000')->where('c_id', '<=', '300000')->whereNull('c_path')->limit(10)->get();
+        $codes = Code::where('c_id', '<=', '330000')->whereNull('c_path')->limit(10)->get();
         $i = 0;
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
