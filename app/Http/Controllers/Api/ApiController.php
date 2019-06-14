@@ -76,7 +76,9 @@ class ApiController extends Controller
             if (!empty($codeInfo->a_scan_times)) {
                 $userOfCodeCity = User::where(['u_account_id' => $codeInfo->q_account_id, 'u_openid' => $user->u_openid])->first();
                 if ($userOfCodeCity) {
-                    $count = PointRecord::where(['pr_uid' => $userOfCodeCity->u_id, 'pr_prize_name' => '产品购买'])->whereDay('pr_created', date('d'))->count();
+                    $count = PointRecord::where(['pr_uid' => $userOfCodeCity->u_id, 'pr_prize_name' => '产品购买'])
+                        ->whereDay('pr_created', date('d'))
+                        ->count();
                     if ($codeInfo->a_scan_times - $count <= 0) {
                         return $this->responseDefine(1002, 'Scan times limit!');
                     }
@@ -152,7 +154,7 @@ class ApiController extends Controller
             $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, '产品购买', 1, $qPoint, $user->u_current_point + $qPoint);
             // 判断是否为会员日
             if ($isDayOfWeek) {
-                Prize::where(['p_account_id' => $user->u_account_id, 'p_type' => Prize::MEMBER_PRIZE])->increment('p_receive_number');
+                Prize::where(['p_account_id' => $codeInfo->q_account_id, 'p_type' => Prize::MEMBER_PRIZE])->increment('p_receive_number');
                 $attributes[] = $pointRecord->setAttributes(Prize::MEMBER_PRIZE, Prize::MEMBER_PRIZE, 1, $qPoint, $user->u_current_point + $qPoint * 2);
             }
             // 增加积分记录
@@ -308,6 +310,7 @@ class ApiController extends Controller
 			})
 			->select(DB::raw('pr_id, pr_point, pr_current_point, pr_updated, pr_prize_type, pr_prize_name'))
             ->orderBy('pr_updated', 'desc')
+            ->orderBy('pr_id', 'desc')
 			->offset(($page - 1) * $pageSize)
 			->limit($pageSize)
 			->get()
@@ -370,7 +373,9 @@ class ApiController extends Controller
     {
         $user = Auth::user();
 
-        $shops = Shop::where('s_account_id', $user->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
+        $shops = Shop::where('s_account_id', $user->u_account_id)
+            ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+            ->get();
 		$data = [];
         Prize::where(['p_type' => Prize::LEGEND_PRIZE, 'p_account_id' => $user->u_account_id])
 			->limit(8)
@@ -474,7 +479,7 @@ class ApiController extends Controller
             // 中奖奖品
             $prize = $prizeList[$result];
 			if ($prize->p_type_id == 7) {
-                $userPrizeOfShoe = UserPrize::where(['up_openid' => $user->u_openid])->first();
+                $userPrizeOfShoe = UserPrize::where(['up_openid' => $user->u_openid, 'up_prize_type_id' => 7])->first();
                 if ($userPrizeOfShoe) {
                     // 已经中过跑鞋，则默认中饮品
                     $prize = $prizeList[0];
@@ -493,11 +498,12 @@ class ApiController extends Controller
 
             // 插入用户中奖数据
             $userPrize = UserPrize::create([
-                'up_uid'        => $user->u_id,
-                'up_openid'     => $user->u_openid,
-                'up_type'       => '抽奖',
-                'up_prize_id'   => $prize->p_id,
-                'up_code'       => isset($couponCode) ? $couponCode->cc_code : date('His').mt_rand(1000, 9999)
+                'up_uid'            => $user->u_id,
+                'up_openid'         => $user->u_openid,
+                'up_prize_type_id'  => $prize->p_type_id,
+                'up_type'           => '抽奖',
+                'up_prize_id'       => $prize->p_id,
+                'up_code'           => isset($couponCode) ? $couponCode->cc_code : date('His').mt_rand(1000, 9999)
             ]);
             // 修改优惠券码为已使用
             if (isset($couponCode)) {
@@ -550,7 +556,9 @@ class ApiController extends Controller
         $page = request()->input('page', 1);
         $pageSize = request()->input('pageSize', 10);
 
-        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
+        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)
+            ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+            ->get();
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '抽奖'])
@@ -614,7 +622,9 @@ class ApiController extends Controller
     {
         $user = Auth::user();
 
-        $shops = Shop::where('s_account_id', $user->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
+        $shops = Shop::where('s_account_id', $user->u_account_id)
+            ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+            ->get();
         $data = [];
         Prize::where(['p_type' => Prize::EXCHANGE_PRIZE, 'p_account_id' => $user->u_account_id])
 			->limit(8)
@@ -763,7 +773,9 @@ class ApiController extends Controller
         $page = $request->input('page', 1);
         $pageSize = $request->input('pageSize', 10);
 
-        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))->get();
+        $shops = Shop::where('s_account_id', Auth::user()->u_account_id)
+            ->select(DB::raw('s_id, s_city, s_number, s_name, s_phone, s_address'))
+            ->get();
         $data = [];
         UserPrize::leftJoin('prizes', 'p_id', 'up_prize_id')
             ->where(['up_uid' => Auth::id(), 'up_type' => '兑换'])

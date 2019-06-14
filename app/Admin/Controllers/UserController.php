@@ -232,7 +232,8 @@ class UserController extends Controller
 					$query->where('u_account_id', $account->a_id);
 				}
 			})
-			->orderBy('pr_updated', 'desc');
+			->orderBy('pr_updated', 'desc')
+			->orderBy('pr_id', 'desc');
 
         $grid->pr_id('ID');
         $grid->u_headimg('用户头像')->image('', 64, 64)->expand(function () {
@@ -404,7 +405,7 @@ class UserController extends Controller
         $input = $request->input();
         $userPrize = UserPrize::find($id);
         if ($userPrize) {
-            if ($userPrize->up_received == 0) {
+            if (empty($userPrize->up_number)) {
                 Prize::where(['p_id' => $userPrize->up_prize_id])->increment('p_used_number', 1);
                 $update['up_received'] = 1;
             }

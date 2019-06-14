@@ -46,6 +46,8 @@ class PointRecordExporter extends ExcelExporter
                 }
                 $query->where('pr_received', 1);
 			})
-			->select(array_keys($this->columns));
+			->select(array_keys($this->columns))
+            ->orderBy('pr_updated', 'desc')
+            ->orderBy('pr_id', 'desc');
     }
 }

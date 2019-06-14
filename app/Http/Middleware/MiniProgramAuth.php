@@ -18,7 +18,7 @@ class MiniProgramAuth
             'path'      => request()->path(),
             'method'    => request()->method(),
             'ip'        => request()->ip(),
-            'input'     => json_encode(array_merge(request()->except(['head']), ['s3rd' => request()->header('s3rd')])),
+            'input'     => json_encode(array_merge(request()->except(['head']), ['s3rd' => request()->header('s3rd')]), 256),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now()
         ]);

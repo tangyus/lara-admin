@@ -270,10 +270,11 @@ class ShopController extends Controller
         } else {
             if (Admin::user()->isRole('市场人员')) {
                 $account = Account::where('a_account', Admin::user()->username)->first();
-                $lastShop = Shop::where('s_account_id', $account->a_id)->orderBy('s_id', 'desc')->first();
+                $lastShop = Shop::where('s_account_id', $account->a_id)->orderBy('s_id', 'desc')->count();
 				$prefix = $account->a_account;
 				if ($lastShop) {
-                    $count = intval(substr($lastShop->s_number, strripos($lastShop->s_number, '0') + 1)) + 1;
+				    $count = $lastShop + 1;
+//                    $count = intval(substr($lastShop->s_number, strripos($lastShop->s_number, '0') + 1)) + 1;
                 } else {
 				    $count = 1;
                 }
@@ -298,9 +299,8 @@ class ShopController extends Controller
             $form->text('s_name', '门店名称')->rules('required', ['required' => '请输入门店名称']);
             $form->text('s_phone', '门店联系电话')->rules('required', ['required' => '请输入门店所在城市']);
             $form->text('s_manager', '门店负责人')->rules('required', ['required' => '请输入门店联系人姓名']);
-            $form->text('s_manager_phone', '负责人电话')->rules('required|regex:/^[1][3,4,5,6,7,8,9][0-9]{9}$/', [
+            $form->text('s_manager_phone', '负责人电话')->rules('required', [
                 'required'  => '请输入门店负责人电话',
-                'regex'     => '电话号码非法'
             ]);
             $form->text('s_address', '门店地址')->rules('required', ['required' => '请输入门店地址']);
             $form->text('s_password', '门店核销密码')->placeholder('市场人员与门店负责人确认，建议设置为门店负责人手机号')->rules('required', ['required' => '请输入门店核销密码']);

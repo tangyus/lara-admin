@@ -277,9 +277,9 @@ class PrizeController extends Controller
             })
             ->get()
             ->pluck('s_name', 's_id'))
-            ->help('优惠券/新人礼/进阶礼/会员礼/跑鞋不需设定门店');
-        $form->text('p_phone_number', '活动热线')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
-        $form->text('p_rule', '领取规则')->help('优惠券/新人礼/进阶礼/会员礼不需要填写');;
+            ->help('优惠券/跑鞋/新人礼/进阶礼/会员礼 不需设定门店');
+        $form->text('p_phone_number', '活动热线')->help('优惠券/新人礼/进阶礼/会员礼 不需要填写');;
+        $form->text('p_rule', '领取规则')->help('优惠券/新人礼/进阶礼/会员礼 不需要填写');;
         $form->switch('p_state', '是否停用')->states($this->states);
 
         $form->tools(function ($tools) {
@@ -294,12 +294,8 @@ class PrizeController extends Controller
                         var val = $($(a).children()[0]).val();
                         if (val == '闪电传奇礼') {
                             $('#p_deadline').val('2019-09-30 23:59:59');
-//                            $('#p_rate').attr('disabled', false);
-//                            $('#p_point').attr('disabled', true);
                         } else if (val == '闪电积分礼') {
                             $('#p_deadline').val('2019-09-30 23:59:59');
-//                            $('#p_point').attr('disabled', false);
-//                            $('#p_rate').attr('disabled', true);
                         } else {
                             if (val == '闪电新人礼' || val == '闪电进阶礼') {
                                 $('#p_deadline').val('2019-09-15 23:59:59');

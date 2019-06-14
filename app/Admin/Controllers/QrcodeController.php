@@ -146,9 +146,9 @@ class QrcodeController extends Controller
         $form->ignore('q_district');
 
         // 下载导出二维码
-        $form->saved(function (Form $form) {
-            $this->zipCodes($form->model());
-        });
+//        $form->saved(function (Form $form) {
+//            $this->zipCodes($form->model());
+//        });
 
         return $form;
     }
