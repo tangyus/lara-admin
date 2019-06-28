@@ -244,7 +244,7 @@ class UserController extends Controller
         $grid->pr_point('积分')->display(function ($point) {
             return ($point > 0) ? "<span class='label label-info'>获得 $point</span>" : "<span class='label label-danger'>消耗 $point</span>";
         });
-        $grid->pr_created('时间');
+        $grid->pr_updated('时间');
         $grid->pr_current_point('当前用户积分');
 
         $grid->disableCreateButton();

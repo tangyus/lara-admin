@@ -146,9 +146,9 @@ class QrcodeController extends Controller
         $form->ignore('q_district');
 
         // 下载导出二维码
-//        $form->saved(function (Form $form) {
-//            $this->zipCodes($form->model());
-//        });
+        $form->saved(function (Form $form) {
+            $this->zipCodes($form->model());
+        });
 
         return $form;
     }
@@ -161,7 +161,7 @@ class QrcodeController extends Controller
     {
         $codes = Code::whereNull('c_qrcode_id')->orderBy('c_id', 'asc')->limit($model->q_number)->get();
         if (count($codes) > 0) {
-            $path = 'd:/download';
+            $path = 'E:/pamierde/download';
             $date = date('Ymd');
             $zipPath = $path . "/{$date}_{$model->q_city}_{$model->q_id}_{$model->q_number}.zip";
             $ids = [];
@@ -172,13 +172,13 @@ class QrcodeController extends Controller
 //                    if (file_exists($publicPath . $codeFile->c_path)) {
                         // 将文件加入zip对象
                         $ids[] = $codeFile['c_id'];
-                        $zip->addFile('d:/' . $codeFile->c_path, $codeFile->c_filename);
+                        $zip->addFile('E:/pamierde' . $codeFile->c_path, $codeFile->c_filename);
 //                    }
                 }
                 $zip->close(); // 关闭处理的zip文件
                 Code::whereIn('c_id', $ids)->update(['c_qrcode_id' => $model->q_id]);
 
-                $model->q_zip_path = "d:/download/{$date}_{$model->q_city}_{$model->q_id}_{$model->q_number}.zip";
+                $model->q_zip_path = "E:/pamierde/download/{$date}_{$model->q_city}_{$model->q_id}_{$model->q_number}.zip";
                 $model->save();
             }
         }

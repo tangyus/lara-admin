@@ -196,6 +196,9 @@ class ApiController extends Controller
                     }
                 }
             }
+            Stats::where('s_uid', $user->u_id)->whereNull('s_account_id')->update([
+                's_account_id'  => $user->u_account_id,
+            ]);
 
             // 活动规则
             $rule = Rule::first();

@@ -125,7 +125,8 @@ class Controller extends BaseController
         ];
         $app = Factory::miniProgram($config);
 
-        $codes = Code::whereNull('c_path')->where('c_id', '>', '330000')->limit(10)->get();
+        $codes = Code::whereNull('c_path')->where('c_id', '>', '1085000')->where('c_id', '<=', '1100000')->limit(10)->get();
+//        $codes = Code::whereNull('c_path')->where('c_id', '>', '590000')->where('c_id', '<=', '600000')->limit(10)->get();
         $i = 0;
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
@@ -134,7 +135,46 @@ class Controller extends BaseController
             ]);
             if ($response instanceof StreamResponse) {
                 $filename = $code->c_id.'_'.$code->c_code.'.jpg';
-                $response->saveAs('d:/codes', $filename);
+                $response->saveAs('E:/pamierde/codes2', $filename);
+
+                $code->c_path = '/codes/' . $filename;
+                $code->c_filename = $filename;
+                $code->save();
+                $i++;
+            }
+        }
+        return ['count' => $i];
+    }
+
+    public function wxCode1()
+    {
+        $config = [
+            'app_id' => 'wx82de84528e164c9b',
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47',
+
+            // 下面为可选项
+            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
+            'response_type' => 'array',
+
+            'log' => [
+                'driver' => 'daily',
+                'level' => 'info',
+                'file' => 'd:/wechat.log',
+            ],
+        ];
+        $app = Factory::miniProgram($config);
+
+        $codes = Code::whereNull('c_path')->where('c_id', '>', '1000000')->where('c_id', '<=', '1085000')->limit(10)->get();
+//        $codes = Code::where('c_id', '<=', '900000')->whereNull('c_path')->orderBy('c_id', 'desc')->limit(10)->get();
+        $i = 0;
+        foreach ($codes as $code) {
+            $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
+                'page'  => 'Pages/Index/Index',
+                'width' => 280,
+            ]);
+            if ($response instanceof StreamResponse) {
+                $filename = $code->c_id.'_'.$code->c_code.'.jpg';
+                $response->saveAs('E:/pamierde/codes2', $filename);
 
                 $code->c_path = '/codes/' . $filename;
                 $code->c_filename = $filename;
@@ -163,7 +203,8 @@ class Controller extends BaseController
         ];
         $app = Factory::miniProgram($config);
 
-        $codes = Code::where('c_id', '<=', '330000')->whereNull('c_path')->limit(10)->get();
+        $codes = Code::whereNull('c_path')->where('c_id', '>', '900000')->where('c_id', '<=', '985000')->limit(10)->get();
+//        $codes = Code::where('c_id', '<=', '900000')->whereNull('c_path')->orderBy('c_id', 'desc')->limit(10)->get();
         $i = 0;
         foreach ($codes as $code) {
             $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
@@ -172,7 +213,46 @@ class Controller extends BaseController
             ]);
             if ($response instanceof StreamResponse) {
                 $filename = $code->c_id.'_'.$code->c_code.'.jpg';
-                $response->saveAs('d:/codes', $filename);
+                $response->saveAs('E:/pamierde/codes2', $filename);
+
+                $code->c_path = '/codes/' . $filename;
+                $code->c_filename = $filename;
+                $code->save();
+                $i++;
+            }
+        }
+        return ['count' => $i];
+    }
+
+    public function wxCodeCopy1()
+    {
+        $config = [
+            'app_id' => 'wx82de84528e164c9b',
+            'secret' => '74f2e0be5ec582ba0b858c8c6bb7fd47',
+
+            // 下面为可选项
+            // 指定 API 调用返回结果的类型：array(default)/collection/object/raw/自定义类名
+            'response_type' => 'array',
+
+            'log' => [
+                'driver' => 'daily',
+                'level' => 'info',
+                'file' => 'd:/wechat.log',
+            ],
+        ];
+        $app = Factory::miniProgram($config);
+
+        $codes = Code::whereNull('c_path')->where('c_id', '>', '985000')->where('c_id', '<=', '1000000')->limit(10)->get();
+//        $codes = Code::where('c_id', '<=', '900000')->whereNull('c_path')->orderBy('c_id', 'desc')->limit(10)->get();
+        $i = 0;
+        foreach ($codes as $code) {
+            $response = $app->app_code->getUnlimit('SDBJJFYL_' . $code->c_code, [
+                'page'  => 'Pages/Index/Index',
+                'width' => 280,
+            ]);
+            if ($response instanceof StreamResponse) {
+                $filename = $code->c_id.'_'.$code->c_code.'.jpg';
+                $response->saveAs('E:/pamierde/codes2', $filename);
 
                 $code->c_path = '/codes/' . $filename;
                 $code->c_filename = $filename;
